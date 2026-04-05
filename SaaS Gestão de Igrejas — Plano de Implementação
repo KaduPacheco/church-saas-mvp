@@ -1,0 +1,321 @@
+# SaaS Gestão de Igrejas — Plano de Implementação
+
+## Visão Geral
+
+MVP de um SaaS multi-tenant para gestão de igrejas, com backend Node.js (Express), frontend Vue.js (Vite) e PostgreSQL. O sistema suporta hierarquia **Igreja Sede → Congregações/Filiais** e controle de acesso baseado em cargos.
+
+---
+
+## Decisões de Arquitetura
+
+### Multi-Tenancy: Shared Database, Shared Schema
+- Cada registro possui `church_id` (FK para a igreja sede / tenant principal).
+- **Justificativa**: Para um MVP, é a abordagem mais simples e econômica. Um único banco atende todos os tenants. A migração para schema-per-tenant ou database-per-tenant pode ser feita no futuro sem grandes refatorações, pois o `church_id` já isola os dados.
+
+### Hierarquia Sede → Congregações
+- A tabela `churches` usa auto-referência (`parent_id`): se `parent_id IS NULL`, é uma **sede**; caso contrário, é uma **congregação/filial**.
+- O tenant é sempre a sede. Congregações herdam o `church_id` da sede.
+
+### Autenticação & Autorização
+- **JWT** (access token + refresh token) para autenticação stateless.
+- **RBAC** (Role-Based Access Control) com tabela de `roles` cadastráveis e tabela de `permissions` para controle granular.
+- Middleware de tenant isolation: toda query filtra automaticamente pelo `church_id` do usuário logado.
+
+### Estrutura Backend — Modular por Domínio
+```
+/backend
+├── src/
+│   ├── config/          # DB, env, constantes
+│   ├── middlewares/      # auth, tenant, errorHandler
+│   ├── modules/
+│   │   ├── auth/         # controller, service, routes, validation
+│   │   ├── churches/     # controller, service, routes, validation
+│   │   ├── members/      # controller, service, routes, validation
+│   │   ├── roles/        # controller, service, routes, validation
+│   │   └── financial/    # controller, service, routes, validation
+│   ├── database/
+│   │   ├── migrations/   # SQL migrations
+│   │   └── seeds/        # Dados iniciais
+│   ├── utils/            # helpers, responseFormatter
+│   └── app.js            # Express setup
+├── .env.example
+├── package.json
+└── knexfile.js           # Config do Knex (query builder)
+```
+
+### Estrutura Frontend — Vue.js com Vite
+```
+/frontend
+├── src/
+│   ├── assets/           # Ícones, fontes
+│   ├── components/       # Componentes reutilizáveis (UI kit)
+│   ├── composables/      # Lógica reaproveitável (useAuth, useApi)
+│   ├── layouts/          # MainLayout, AuthLayout
+│   ├── pages/            # Views por módulo
+│   │   ├── auth/
+│   │   ├── dashboard/
+│   │   ├── members/
+│   │   ├── roles/
+│   │   └── financial/
+│   ├── router/           # Vue Router
+│   ├── stores/           # Pinia (state management)
+│   ├── services/         # Axios instances, API calls
+│   └── App.vue
+├── .env.example
+├── index.html
+├── package.json
+└── vite.config.js
+```
+
+---
+
+## Modelagem de Dados (PostgreSQL)
+
+```mermaid
+erDiagram
+    CHURCHES {
+        uuid id PK
+        uuid parent_id FK "NULL = sede"
+        string name
+        string cnpj
+        string address
+        string phone
+        string email
+        boolean is_active
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    ROLES {
+        uuid id PK
+        uuid church_id FK
+        string name "Pastor, Obreiro, etc."
+        string description
+        jsonb permissions "Array de permissões"
+        boolean is_system "Cargo padrão do sistema"
+        boolean is_active
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    USERS {
+        uuid id PK
+        uuid church_id FK "Tenant (sede)"
+        uuid congregation_id FK "Congregação, nullable"
+        uuid role_id FK
+        string name
+        string email
+        string password_hash
+        string phone
+        boolean is_active
+        timestamp last_login
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    MEMBERS {
+        uuid id PK
+        uuid church_id FK "Tenant"
+        uuid congregation_id FK "nullable"
+        uuid role_id FK
+        string name
+        string email
+        string phone
+        date birth_date
+        string address
+        date baptism_date
+        date membership_date
+        string status "ativo, inativo, transferido"
+        text notes
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    FINANCIAL_CATEGORIES {
+        uuid id PK
+        uuid church_id FK
+        string name "Dízimo, Oferta, Aluguel, etc."
+        string type "income, expense"
+        boolean is_active
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    FINANCIAL_TRANSACTIONS {
+        uuid id PK
+        uuid church_id FK
+        uuid congregation_id FK "nullable"
+        uuid category_id FK
+        uuid member_id FK "nullable, quem contribuiu"
+        uuid created_by FK "user que registrou"
+        string type "income, expense"
+        decimal amount
+        date transaction_date
+        string description
+        string payment_method "dinheiro, pix, cartão, transferência"
+        string reference_number "comprovante"
+        string status "confirmed, pending, cancelled"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    CHURCHES ||--o{ CHURCHES : "parent"
+    CHURCHES ||--o{ USERS : "belongs to"
+    CHURCHES ||--o{ MEMBERS : "belongs to"
+    CHURCHES ||--o{ ROLES : "has"
+    CHURCHES ||--o{ FINANCIAL_CATEGORIES : "has"
+    CHURCHES ||--o{ FINANCIAL_TRANSACTIONS : "has"
+    ROLES ||--o{ USERS : "has role"
+    ROLES ||--o{ MEMBERS : "has role"
+    FINANCIAL_CATEGORIES ||--o{ FINANCIAL_TRANSACTIONS : "categorized by"
+    MEMBERS ||--o{ FINANCIAL_TRANSACTIONS : "contributed by"
+    USERS ||--o{ FINANCIAL_TRANSACTIONS : "created by"
+```
+
+---
+
+## Etapas de Implementação
+
+### Etapa 1 — Fundação: Estrutura do Projeto + Banco de Dados
+**Escopo:**
+- Inicializar `/backend` com Express, Knex, dotenv, bcrypt, jsonwebtoken
+- Inicializar `/frontend` com Vite + Vue 3 + Vue Router + Pinia + Axios
+- Criar migrations do PostgreSQL para todas as tabelas
+- Seed com dados iniciais (roles padrão, church de exemplo)
+- Configurar conexão com banco e variáveis de ambiente
+
+**Tecnologias instaladas:**
+| Camada | Pacotes |
+|---------|---------|
+| Backend | express, knex, pg, dotenv, bcryptjs, jsonwebtoken, cors, helmet, express-validator, uuid |
+| Frontend | vue@3, vue-router, pinia, axios |
+
+---
+
+### Etapa 2 — Backend: Autenticação e Tenancy
+**Escopo:**
+- Módulo `auth`: registro de igreja (signup), login, refresh token, logout
+- Middleware `authenticate`: valida JWT
+- Middleware `tenantIsolation`: injeta `church_id` em toda request
+- Middleware `authorize`: verifica permissões do cargo
+- Middleware `errorHandler`: tratamento centralizado de erros
+- Utilitário `responseFormatter`: padroniza respostas da API
+
+**Endpoints:**
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| POST | `/api/auth/register` | Registra igreja + admin |
+| POST | `/api/auth/login` | Login com email/senha |
+| POST | `/api/auth/refresh` | Renova access token |
+| POST | `/api/auth/logout` | Invalida refresh token |
+| GET | `/api/auth/me` | Dados do usuário logado |
+
+---
+
+### Etapa 3 — Backend: Gestão de Membros e Cargos
+**Escopo:**
+- Módulo `members`: CRUD completo com filtros e paginação
+- Módulo `roles`: CRUD de cargos com permissões
+- Módulo `churches`: CRUD de congregações/filiais
+- Validações com express-validator
+- Filtros por congregação, cargo, status
+
+**Endpoints:**
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| GET/POST | `/api/members` | Listar/Criar membros |
+| GET/PUT/DELETE | `/api/members/:id` | Detalhe/Editar/Remover |
+| GET/POST | `/api/roles` | Listar/Criar cargos |
+| GET/PUT/DELETE | `/api/roles/:id` | Detalhe/Editar/Remover |
+| GET/POST | `/api/churches` | Listar/Criar congregações |
+| GET/PUT | `/api/churches/:id` | Detalhe/Editar |
+
+---
+
+### Etapa 4 — Backend: Gestão Financeira
+**Escopo:**
+- Módulo `financial`: CRUD de transações e categorias
+- Relatórios: totais por período, por categoria, por congregação
+- Dashboard endpoint com resumo financeiro
+
+**Endpoints:**
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| GET/POST | `/api/financial/categories` | Categorias |
+| GET/POST | `/api/financial/transactions` | Transações |
+| GET/PUT/DELETE | `/api/financial/transactions/:id` | Detalhe/Editar/Remover |
+| GET | `/api/financial/summary` | Resumo financeiro |
+| GET | `/api/dashboard` | Dashboard geral |
+
+---
+
+### Etapa 5 — Frontend: Autenticação e Layout Base
+**Escopo:**
+- Tela de login (design premium, dark mode)
+- Tela de registro de igreja
+- Layout principal: sidebar + header + content area
+- Composable `useAuth` com Pinia store
+- Guard de rotas (proteção contra acesso não autenticado)
+- Service layer com Axios interceptors (JWT auto-inject, refresh)
+- Dashboard placeholder
+
+---
+
+### Etapa 6 — Frontend: Membros, Cargos e Congregações
+**Escopo:**
+- Página de listagem de membros (tabela com busca, filtros, paginação)
+- Formulário de criação/edição de membro
+- Página de gestão de cargos
+- Página de gestão de congregações
+- Componentes reutilizáveis: DataTable, Modal, FormField, StatusBadge
+
+---
+
+### Etapa 7 — Frontend: Módulo Financeiro e Dashboard
+**Escopo:**
+- Dashboard com cards de resumo e gráficos
+- Página de transações (listagem + filtros por data/categoria/tipo)
+- Formulário de lançamento financeiro
+- Página de categorias financeiras
+- Componentes: ChartCard, SummaryCard, DateRangePicker
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Banco de dados:** Você já tem PostgreSQL instalado localmente? Se sim, qual o host, porta, usuário e nome do banco que deseja usar? Caso contrário, posso configurar com valores padrão (`localhost:5432`, banco `church_saas`).
+
+> [!IMPORTANT]
+> **Etapa inicial:** Confirme se posso começar pela **Etapa 1** (fundação do projeto + banco de dados).
+
+> [!IMPORTANT]
+> **Permissões padrão:** Para o MVP, sugiro as seguintes permissões granulares:
+> - `members:read`, `members:write`, `members:delete`
+> - `roles:read`, `roles:write`, `roles:delete`
+> - `financial:read`, `financial:write`, `financial:delete`
+> - `churches:read`, `churches:write`
+> - `dashboard:read`
+> - `admin:full` (acesso total)
+>
+> O cargo **Pastor** teria `admin:full`, **Obreiro/Diácono** teriam acesso a membros e financeiro (read/write), **Membro** teria apenas `dashboard:read` e `members:read` do próprio perfil. Concorda com essa distribuição?
+
+## Open Questions
+
+1. **Node.js version**: Qual versão do Node.js você está usando? (recomendo 18+ para LTS)
+2. **Vue.js**: Prefere Options API ou Composition API? (recomendo Composition API com `<script setup>`)
+3. **Estilização do Frontend**: Vue.js + CSS puro, ou posso usar uma lib de UI como PrimeVue ou Vuetify para acelerar o MVP?
+4. **Deploy futuro**: Tem alguma preferência de hosting? (Render, Railway, Vercel, etc.) — isso pode influenciar pequenas decisões de config.
+
+## Verification Plan
+
+### Automated Tests
+- Rodar migrations e seeds sem erro
+- Testar endpoints com requests manuais via browser subagent ou curl
+- Verificar que o frontend compila e roda sem erros (`npm run dev`)
+- Validar tenant isolation: garantir que um tenant não acessa dados de outro
+
+### Manual Verification
+- Testar fluxo completo: registro → login → criar membros → lançar financeiro
+- Verificar responsividade do frontend
+- Confirmar que as permissões bloqueiam acessos indevidos

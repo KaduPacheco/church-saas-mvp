@@ -1,0 +1,773 @@
+# Etapa 9 — Módulo Financeiro do MVP
+
+---
+
+## 1. Escopo Financeiro do MVP
+
+### O que o MVP FAZ
+
+| Funcionalidade | Descrição |
+|---------------|-----------|
+| Lançar entrada | Registrar dízimo, oferta, doação, campanha ou qualquer receita |
+| Lançar saída | Registrar aluguel, conta de luz, material, salário ou qualquer despesa |
+| Categorizar | Cada lançamento obrigatoriamente pertence a uma categoria (Dízimo, Aluguel, etc.) |
+| Vincular membro | Entradas podem registrar quem contribuiu (opcional) |
+| Filtrar por período | Consultar transações de um mês, trimestre, ano ou intervalo customizado |
+| Filtrar por congregação | Ver financeiro da sede, de uma congregação, ou consolidado |
+| Cancelar transação | Soft delete: muda status para `cancelled` (não exclui do banco) |
+| Resumo financeiro | Totais de entrada, saída, saldo — por período e congregação |
+| Dashboard | Cards e gráficos com visão geral do financeiro |
+
+### O que o MVP NÃO faz (futuro)
+
+| Item | Quando |
+|------|--------|
+| Integração com banco/PIX | V2 — exige gateway de pagamento |
+| Conciliação bancária | V2 — cruzar extrato com lançamentos |
+| Emissão de recibos/carnês | V2 — geração de PDF |
+| Relatório para IRPF | V3 — legislação fiscal |
+| Plano de contas contábil | V3 — complexidade contábil |
+| Multi-moeda | V3 — internacionalização |
+| Recorrência automática | V2 — lançamentos mensais fixos |
+| Anexo de comprovante | V2 — upload de imagem/PDF |
+
+> **Filosofia do MVP financeiro:** Um livro-caixa digital. Entradas e saídas lançadas manualmente, categorizadas, com rastreabilidade de quem lançou e quando. Simples, seguro e auditável.
+
+---
+
+## 2. Tipos de Lançamento
+
+```
+┌─────────────────────────────────────────────────────┐
+│                TIPOS DE LANÇAMENTO                   │
+│                                                      │
+│  📥 ENTRADA (income)                                │
+│  ├── Dízimo de um membro                            │
+│  ├── Oferta do culto de domingo                     │
+│  ├── Doação anônima                                 │
+│  ├── Campanha "Construindo o Futuro"                │
+│  └── Qualquer receita da igreja                     │
+│                                                      │
+│  📤 SAÍDA (expense)                                 │
+│  ├── Aluguel do templo                              │
+│  ├── Conta de energia elétrica                      │
+│  ├── Compra de material para EBD                    │
+│  ├── Pagamento do zelador                           │
+│  └── Qualquer despesa da igreja                     │
+│                                                      │
+│  Regra: amount é SEMPRE positivo.                    │
+│  O sinal é dado pelo type (income = +, expense = −) │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3. Categorias Financeiras
+
+### Categorias padrão criadas no registro da igreja (`is_system = true`)
+
+**Entradas (income)**
+
+| # | Nome | Descrição | Cenário típico |
+|:-:|------|-----------|----------------|
+| 1 | Dízimo | Contribuição dizimal dos membros | Entrada individual, vinculada a membro |
+| 2 | Oferta | Ofertas coletadas no culto | Normalmente valor total, sem vincular membro |
+| 3 | Campanha | Campanhas especiais com objetivo definido | "Campanha do telhado", "Missões 2026" |
+| 4 | Doação | Doações avulsas (internas ou externas) | Doação de empresa, visitante, etc. |
+| 5 | Evento | Receita de eventos (bazar, jantar, etc.) | Venda de ingressos, alimentação |
+| 6 | Outras Entradas | Receitas não classificáveis | Catch-all |
+
+**Saídas (expense)**
+
+| # | Nome | Descrição | Cenário típico |
+|:-:|------|-----------|----------------|
+| 7 | Aluguel | Aluguel de templo ou imóvel | Mensal, valor fixo |
+| 8 | Energia Elétrica | Conta de luz | Mensal |
+| 9 | Água | Conta de água | Mensal |
+| 10 | Manutenção | Reparos, reformas, conservação | Eventual |
+| 11 | Material | Materiais diversos (escritório, limpeza, EBD) | Frequente |
+| 12 | Salários | Pagamento de pessoal (pastor, zelador, etc.) | Mensal |
+| 13 | Missões | Sustento missionário, ofertas para missões | Mensal ou eventual |
+| 14 | Transporte | Combustível, ônibus, viagens | Eventual |
+| 15 | Outras Saídas | Despesas não classificáveis | Catch-all |
+
+**Categorias customizadas:** A igreja pode criar quantas quiser. Exemplo:
+- "Construção do Templo" (income ou expense)
+- "Aquisição de Equipamentos" (expense)
+- "Venda de Livros" (income)
+
+> Categorias têm `type` fixo: uma categoria de `income` não pode receber lançamentos de `expense` e vice-versa.
+
+---
+
+## 4. Campos do Lançamento Financeiro
+
+| Campo | Tipo | Obrigatório | Regras |
+|-------|------|:-----------:|--------|
+| Tipo | seleção | ✅ | `income` ou `expense`. Define se é entrada ou saída |
+| Categoria | seleção | ✅ | Filtrada pelo tipo selecionado. Só mostra categorias do mesmo tipo |
+| Valor (R$) | decimal | ✅ | Sempre positivo. Mínimo: 0,01. Máximo: 999.999.999,99 |
+| Data | date | ✅ | Data da transação (não é necessariamente a data de lançamento). Não pode ser futura para o MVP |
+| Forma de pagamento | seleção | ✅ | Dinheiro, PIX, Cartão Crédito, Cartão Débito, Transferência, Cheque, Outro |
+| Congregação | seleção | ❌ | NULL = sede. Se usuário é de congregação, preenchido automaticamente |
+| Membro contribuinte | seleção/busca | ❌ | Apenas para entradas. Busca por nome no autocomplete |
+| Descrição | texto | ❌ | Observação sobre o lançamento |
+| Nº do comprovante | texto | ❌ | Número de recibo, nota fiscal, comprovante de PIX |
+
+**Campos automáticos (backend):**
+
+| Campo | Valor |
+|-------|-------|
+| id | UUID gerado |
+| church_id | Extraído do token (tenant) |
+| created_by | ID do usuário que está lançando (do token) |
+| status | `confirmed` (default). Pode mudar para `pending` ou `cancelled` |
+| created_at | NOW() |
+| updated_at | NOW() |
+
+---
+
+## 5. Regras de Negócio
+
+### Criação de Lançamento
+
+| # | Regra |
+|---|-------|
+| F1 | O `type` da transação deve ser **igual** ao `type` da categoria. Backend valida essa consistência |
+| F2 | O `amount` é **sempre positivo**. O sistema determina se é + ou − pelo `type` |
+| F3 | A `transaction_date` não pode ser no futuro (MVP). Lançamentos retroativos são permitidos |
+| F4 | O campo `member_id` só pode ser preenchido se `type = income`. Em despesas, `member_id = NULL` |
+| F5 | O `created_by` é **sempre** o usuário logado. Não pode ser sobrescrito |
+| F6 | Se o usuário é de congregação, `congregation_id` é preenchido automaticamente e não pode ser alterado |
+| F7 | O status padrão de um novo lançamento é `confirmed` |
+
+### Edição de Lançamento
+
+| # | Regra |
+|---|-------|
+| F8 | Lançamentos com status `cancelled` **não podem ser editados** |
+| F9 | Ao editar, o campo `created_by` **não muda** (mantém quem criou originalmente) |
+| F10 | `updated_at` é atualizado automaticamente pelo trigger |
+
+### Cancelamento
+
+| # | Regra |
+|---|-------|
+| F11 | Cancelar muda o `status` para `cancelled`. O registro **permanece** no banco para auditoria |
+| F12 | Lançamentos cancelados **não entram** nos cálculos de totais e resumos |
+| F13 | Cancelamento registra no `description` (append) quem cancelou e quando: "Cancelado por [user] em [data]" |
+
+### Integridade
+
+| # | Regra |
+|---|-------|
+| F14 | Não é possível excluir fisicamente uma transação (sem endpoint DELETE que apaga do banco) |
+| F15 | Não é possível excluir uma categoria que tem transações vinculadas (FK RESTRICT) |
+
+---
+
+## 6. Separação Sede × Congregação
+
+```
+┌───────────────────────────────────────────────────────────────────────┐
+│  COMO O FINANCEIRO FUNCIONA NA HIERARQUIA                             │
+│                                                                       │
+│  Igreja Sede "Comunidade da Graça"                                    │
+│  ├── Caixa da SEDE                                                    │
+│  │   ├── Dízimos recebidos na sede      (congregation_id = NULL)      │
+│  │   ├── Ofertas do culto da sede       (congregation_id = NULL)      │
+│  │   ├── Aluguel do templo principal    (congregation_id = NULL)      │
+│  │   └── Salário do pastor titular      (congregation_id = NULL)      │
+│  │                                                                    │
+│  ├── Caixa da CONGREGAÇÃO CENTRO                                     │
+│  │   ├── Dízimos recebidos na CG Centro (congregation_id = "uuid-1") │
+│  │   ├── Ofertas do culto da CG Centro  (congregation_id = "uuid-1") │
+│  │   ├── Aluguel do salão               (congregation_id = "uuid-1") │
+│  │   └── Material de limpeza            (congregation_id = "uuid-1") │
+│  │                                                                    │
+│  └── Caixa da CONGREGAÇÃO NORTE                                      │
+│      ├── Dízimos recebidos na CG Norte  (congregation_id = "uuid-2") │
+│      ├── Ofertas do culto da CG Norte   (congregation_id = "uuid-2") │
+│      └── Conta de luz                   (congregation_id = "uuid-2") │
+│                                                                       │
+│  CONSOLIDADO = Sede + Centro + Norte (tudo com o mesmo church_id)     │
+└───────────────────────────────────────────────────────────────────────┘
+```
+
+### Visibilidade por perfil de usuário
+
+| Perfil | congregation_id do User | O que vê | Pode lançar |
+|--------|:----------------------:|----------|:-----------:|
+| Adm. Geral | NULL (sede) | Consolidado: sede + todas as CGs | Em qualquer CG |
+| Adm. Congregação | "uuid-1" | Apenas CG Centro | Apenas na CG Centro |
+| Tesoureiro da sede | NULL | Consolidado: sede + todas as CGs | Em qualquer CG |
+| Tesoureiro de CG | "uuid-2" | Apenas CG Norte | Apenas na CG Norte |
+| Visualizador | qualquer | Conforme seu escopo (read-only) | ❌ |
+
+### Lógica no backend
+
+```
+GET /api/financial/transactions
+
+SE user.congregationId é NULL (sede):
+    → Sem filtro de congregação (vê tudo)
+    → Pode passar ?congregation_id=uuid para filtrar uma CG específica
+    → Pode passar ?congregation_id=sede para filtrar só a sede (NULL)
+
+SE user.congregationId é "uuid" (congregação):
+    → WHERE congregation_id = user.congregationId (forçado)
+    → Query param congregation_id é IGNORADO (não pode ver outros)
+```
+
+### Prestação de contas por congregação
+
+```
+GET /api/financial/summary?congregation_id=uuid-1&period=2026-03
+
+Response:
+{
+  "congregation": "Congregação Centro",
+  "period": "Março/2026",
+  "totalIncome": 12500.00,
+  "totalExpense": 8300.00,
+  "balance": 4200.00,
+  "incomeByCategory": [
+    { "category": "Dízimo",  "total": 8000.00 },
+    { "category": "Oferta",  "total": 3500.00 },
+    { "category": "Doação",  "total": 1000.00 }
+  ],
+  "expenseByCategory": [
+    { "category": "Aluguel",  "total": 3000.00 },
+    { "category": "Energia",  "total": 800.00 },
+    { "category": "Material", "total": 500.00 },
+    { "category": "Outros",   "total": 4000.00 }
+  ]
+}
+```
+
+> Cada congregação pode gerar seu resumo mensal de forma independente. A sede vê o consolidado ou qualquer congregação individual.
+
+---
+
+## 7. Acesso ao Financeiro por Perfil
+
+```
+                          Adm.Geral   Adm.Cong   Operador   Tesoureiro   Visualizador
+                          ─────────   ────────   ────────   ──────────   ────────────
+Ver transações            ✅          ✅                     ✅           (se tiver
+                                                                          financial:read)
+Lançar entrada/saída      ✅          ✅                     ✅            
+Editar lançamento         ✅          ✅                     ✅            
+Cancelar lançamento       ✅                                ✅            
+Ver resumos/dashboard     ✅          ✅                     ✅           ✅ (parcial)
+Gerenciar categorias      ✅                                ✅            
+Criar categorias          ✅                                              
+Excluir categorias        ✅                                              
+
+Escopo de dados:
+├── Adm. Geral:           tudo (sede + CGs)
+├── Adm. Congregação:     sua CG apenas
+├── Tesoureiro da sede:   tudo (sede + CGs)
+├── Tesoureiro de CG:     sua CG apenas
+└── Visualizador:         conforme seu escopo (read-only)
+```
+
+---
+
+## 8. Endpoints (Backend)
+
+### Categorias Financeiras (`/api/financial/categories`)
+
+| Método | Rota | Permissão | Descrição |
+|--------|------|-----------|-----------|
+| GET | `/api/financial/categories` | `financial:read` | Listar categorias do tenant |
+| POST | `/api/financial/categories` | `financial:write` | Criar categoria customizada |
+| PUT | `/api/financial/categories/:id` | `financial:write` | Editar categoria |
+| DELETE | `/api/financial/categories/:id` | `financial:delete` | Excluir categoria customizada |
+
+**GET `/api/financial/categories`**
+
+```
+Query params:
+├── type        → string (income, expense, all) Default: all
+├── is_active   → boolean Default: true
+
+Response 200:
+{
+  "success": true,
+  "data": [
+    {
+      "id": "uuid",
+      "name": "Dízimo",
+      "type": "income",
+      "description": "Contribuição dizimal",
+      "isSystem": true,
+      "isActive": true,
+      "transactionsCount": 156
+    },
+    ...
+  ]
+}
+```
+
+**POST `/api/financial/categories`**
+
+```
+Body:
+{
+  "name": "Construção do Templo",
+  "type": "income",
+  "description": "Campanha para construção do novo templo"
+}
+
+Validações:
+├── name: obrigatório, 2-100 caracteres
+├── type: obrigatório, deve ser "income" ou "expense"
+├── Unicidade: (church_id, type, name)
+└── church_id: do token
+
+Response 201: { success: true, data: { ... } }
+Response 409: "Já existe uma categoria de entrada com esse nome"
+```
+
+---
+
+### Transações Financeiras (`/api/financial/transactions`)
+
+| Método | Rota | Permissão | Descrição |
+|--------|------|-----------|-----------|
+| GET | `/api/financial/transactions` | `financial:read` | Listar com filtros e paginação |
+| GET | `/api/financial/transactions/:id` | `financial:read` | Detalhe de uma transação |
+| POST | `/api/financial/transactions` | `financial:write` | Criar lançamento |
+| PUT | `/api/financial/transactions/:id` | `financial:write` | Editar lançamento |
+| PATCH | `/api/financial/transactions/:id/cancel` | `financial:delete` | Cancelar lançamento |
+
+**GET `/api/financial/transactions`**
+
+```
+Query params:
+├── type              → string (income, expense, all) Default: all
+├── status            → string (confirmed, pending, cancelled, all) Default: confirmed
+├── category_id       → uuid
+├── congregation_id   → uuid (ou "sede" para filtrar apenas sede)
+│                       Ignorado para user de congregação
+├── member_id         → uuid (contribuições de um membro específico)
+├── payment_method    → string (cash, pix, credit_card, ...)
+├── date_from         → date (início do período)
+├── date_to           → date (fim do período)
+├── search            → string (busca na descrição)
+├── page              → integer Default: 1
+├── limit             → integer Default: 20, max: 100
+├── sort_by           → string (transaction_date, amount, created_at)
+│                       Default: transaction_date
+└── sort_order        → string (asc, desc) Default: desc
+
+Response 200:
+{
+  "success": true,
+  "data": [
+    {
+      "id": "uuid",
+      "type": "income",
+      "categoryName": "Dízimo",
+      "amount": 500.00,
+      "transactionDate": "2026-04-01",
+      "description": "Dízimo referente a março/2026",
+      "paymentMethod": "pix",
+      "memberName": "João Silva",
+      "congregationName": "Sede",
+      "status": "confirmed",
+      "createdByName": "Secretária Maria"
+    },
+    ...
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "total": 234,
+    "totalPages": 12
+  },
+  "summary": {
+    "totalIncome": 15200.00,
+    "totalExpense": 9800.00,
+    "balance": 5400.00
+  }
+}
+```
+
+> O `summary` é calculado sobre o **conjunto filtrado** (não sobre todos os dados). Se o usuário filtra "março/2026", o summary mostra totais de março.
+
+**POST `/api/financial/transactions`**
+
+```
+Body:
+{
+  "type": "income",
+  "categoryId": "uuid",
+  "amount": 500.00,
+  "transactionDate": "2026-04-01",
+  "paymentMethod": "pix",
+  "congregationId": null,
+  "memberId": "uuid",
+  "description": "Dízimo referente a março/2026",
+  "referenceNumber": "PIX-20260401-001"
+}
+
+Validações backend:
+├── type: obrigatório, "income" ou "expense"
+├── categoryId: obrigatório, deve existir no tenant, type da categoria deve bater com type da transação
+├── amount: obrigatório, > 0, máximo 2 casas decimais
+├── transactionDate: obrigatório, não pode ser futura
+├── paymentMethod: obrigatório, valor válido
+├── congregationId: se user é de CG → forçado; se user é sede → aceita qualquer CG do tenant ou null
+├── memberId: se preenchido, deve existir no tenant. Se type = expense → forçar null
+└── referenceNumber: único por tenant se preenchido (evita lançamento duplicado)
+
+Campos automáticos:
+├── church_id = req.churchId
+├── created_by = req.user.userId
+├── status = "confirmed"
+└── id, created_at, updated_at
+
+Response 201: { success: true, data: { ... transação criada } }
+Response 422: campos inválidos
+```
+
+**PATCH `/api/financial/transactions/:id/cancel`**
+
+```
+Body:
+{
+  "reason": "Lançamento duplicado"     ← opcional, mas recomendado
+}
+
+Lógica:
+├── Busca transação por id + church_id
+├── Se já está cancelled → 400 "Transação já cancelada"
+├── Muda status para "cancelled"
+├── Appenda na description: "\n[Cancelado por Maria em 05/04/2026: Lançamento duplicado]"
+└── updated_at atualizado pelo trigger
+
+Response 200: { success: true, data: { id, status: "cancelled" } }
+```
+
+---
+
+### Resumos Financeiros
+
+| Método | Rota | Permissão | Descrição |
+|--------|------|-----------|-----------|
+| GET | `/api/financial/summary` | `financial:read` | Resumo por período e congregação |
+| GET | `/api/dashboard` | `dashboard:read` | Dashboard geral (membros + financeiro) |
+
+**GET `/api/financial/summary`**
+
+```
+Query params:
+├── period        → string (YYYY-MM ou YYYY) Default: mês atual
+├── congregation_id → uuid ou "all" Default: all
+
+Response 200:
+{
+  "success": true,
+  "data": {
+    "period": "2026-04",
+    "congregation": "Todas",
+    "totalIncome": 28500.00,
+    "totalExpense": 18200.00,
+    "balance": 10300.00,
+    "incomeByCategory": [
+      { "categoryId": "uuid", "name": "Dízimo",  "total": 18000.00, "percentage": 63.2 },
+      { "categoryId": "uuid", "name": "Oferta",  "total": 7500.00,  "percentage": 26.3 },
+      { "categoryId": "uuid", "name": "Doação",  "total": 3000.00,  "percentage": 10.5 }
+    ],
+    "expenseByCategory": [
+      { "categoryId": "uuid", "name": "Salários",  "total": 8000.00, "percentage": 44.0 },
+      { "categoryId": "uuid", "name": "Aluguel",   "total": 5000.00, "percentage": 27.5 },
+      { "categoryId": "uuid", "name": "Energia",   "total": 2200.00, "percentage": 12.1 },
+      { "categoryId": "uuid", "name": "Material",  "total": 1500.00, "percentage": 8.2 },
+      { "categoryId": "uuid", "name": "Outros",    "total": 1500.00, "percentage": 8.2 }
+    ],
+    "byCongregation": [
+      { "id": null,     "name": "Sede",   "income": 15000.00, "expense": 12000.00, "balance": 3000.00 },
+      { "id": "uuid-1", "name": "Centro", "income": 8500.00,  "expense": 4200.00,  "balance": 4300.00 },
+      { "id": "uuid-2", "name": "Norte",  "income": 5000.00,  "expense": 2000.00,  "balance": 3000.00 }
+    ],
+    "monthlyTrend": [
+      { "month": "2026-01", "income": 25000.00, "expense": 17000.00 },
+      { "month": "2026-02", "income": 26500.00, "expense": 16800.00 },
+      { "month": "2026-03", "income": 27200.00, "expense": 17500.00 },
+      { "month": "2026-04", "income": 28500.00, "expense": 18200.00 }
+    ]
+  }
+}
+```
+
+**GET `/api/dashboard`**
+
+```
+Response 200:
+{
+  "success": true,
+  "data": {
+    "members": {
+      "total": 347,
+      "active": 310,
+      "newThisMonth": 8
+    },
+    "financial": {
+      "currentMonth": {
+        "income": 28500.00,
+        "expense": 18200.00,
+        "balance": 10300.00
+      },
+      "previousMonth": {
+        "income": 27200.00,
+        "expense": 17500.00,
+        "balance": 9700.00
+      },
+      "variation": {
+        "incomePercent": 4.8,
+        "expensePercent": 4.0,
+        "balancePercent": 6.2
+      }
+    },
+    "congregations": {
+      "total": 3,
+      "active": 3
+    },
+    "recentTransactions": [
+      {
+        "id": "uuid",
+        "type": "income",
+        "categoryName": "Dízimo",
+        "amount": 500.00,
+        "transactionDate": "2026-04-05",
+        "memberName": "João Silva"
+      },
+      ...
+    ]
+  }
+}
+```
+
+---
+
+## 9. Telas do Frontend
+
+### Tela 1: Listagem de Transações (`/financial/transactions`)
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  💰 Transações Financeiras                       [+ Novo Lançamento] │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
+│  │  📥 Entradas  │  │  📤 Saídas    │  │  💵 Saldo    │              │
+│  │  R$ 28.500   │  │  R$ 18.200   │  │  R$ 10.300   │              │
+│  │  ▲ 4.8%      │  │  ▲ 4.0%      │  │  ▲ 6.2%      │              │
+│  └──────────────┘  └──────────────┘  └──────────────┘              │
+│                                                                      │
+│  Filtros:  [Período: Abr/2026 ▾]  [Tipo: Todos ▾]                   │
+│            [Categoria: Todas ▾]    [Congregação: Todas ▾]            │
+│            [Pagamento: Todos ▾]    [Status: Confirmados ▾]           │
+│                                                                      │
+│  🔍 Buscar na descrição...                                          │
+│                                                                      │
+│  ┌──────┬───────────┬──────────┬────────┬──────────┬──────┬───────┐ │
+│  │ Data │ Categoria │ Descrição│  Valor │ Pagto    │ Cong.│ Ações │ │
+│  ├──────┼───────────┼──────────┼────────┼──────────┼──────┼───────┤ │
+│  │ 05/04│ Dízimo    │ Ref. mar │📥  500 │ PIX      │ Sede │  ⋮    │ │
+│  │ 04/04│ Aluguel   │ Abril    │📤 3000 │ Transfer.│ Sede │  ⋮    │ │
+│  │ 03/04│ Oferta    │ Culto dom│📥 1200 │ Dinheiro │Centro│  ⋮    │ │
+│  │ 02/04│ Material  │ Limpeza  │📤  180 │ PIX      │ Norte│  ⋮    │ │
+│  └──────┴───────────┴──────────┴────────┴──────────┴──────┴───────┘ │
+│                                                                      │
+│  Menu ⋮ por linha:                                                   │
+│  ├── 👁️ Ver detalhes                                                │
+│  ├── ✏️ Editar               (v-can="financial:write")              │
+│  └── ❌ Cancelar              (v-can="financial:delete")             │
+│                                                                      │
+│                         < 1 2 3 ... 12 >                             │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**Comportamentos:**
+- Cards de resumo no topo calculados sobre o filtro atual
+- Valores de entrada em verde, saída em vermelho
+- Porcentagem de variação comparada ao mês anterior
+- Filtro de período: seletor de mês/ano (padrão = mês atual)
+- Filtro de congregação: visível apenas para users da sede
+- Ordenação padrão: data decrescente (mais recentes primeiro)
+- Transações canceladas: linha com opacidade reduzida + texto riscado
+
+---
+
+### Tela 2: Formulário de Lançamento (`/financial/transactions/new`)
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  💰 Novo Lançamento                                                  │
+│  ← Voltar para transações                                            │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ── TIPO ────────────────────────────────────────────────────────── │
+│                                                                      │
+│  (●) 📥 Entrada     ( ) 📤 Saída                                    │
+│                                                                      │
+│  ── DADOS DO LANÇAMENTO ─────────────────────────────────────────── │
+│                                                                      │
+│  Categoria *          [Dízimo ▾]          ← filtrada pelo tipo       │
+│  Valor (R$) *         [R$ 500,00]         ← input com máscara       │
+│  Data *               [05/04/2026]        ← default: hoje           │
+│  Forma de pagamento * [PIX ▾]                                        │
+│  Congregação          [Sede ▾]            ← oculto se user de CG    │
+│                                                                      │
+│  ── CONTRIBUINTE (apenas entrada) ───────────────────────────────── │
+│                                                                      │
+│  Membro               [🔍 Buscar membro...    ]                     │
+│                        ℹ️ Opcional. Se anônimo, deixe em branco.    │
+│                                                                      │
+│  ── OBSERVAÇÕES ─────────────────────────────────────────────────── │
+│                                                                      │
+│  Descrição            [Dízimo referente a março/2026          ]      │
+│  Nº comprovante       [PIX-20260401-001                      ]      │
+│                                                                      │
+│                                  [Cancelar]   [Salvar Lançamento]    │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**Comportamentos:**
+- Toggle tipo (entrada/saída) no topo → recarrega categorias filtradas
+- Campo "Membro contribuinte": autocomplete que busca membros pelo nome (`GET /api/members?search=`)
+- Seção "Contribuinte" visível apenas quando tipo = entrada
+- Campo "Congregação": fixo e desabilitado para users de congregação
+- Valor com máscara monetária brasileira (R$ 1.234,56)
+- Após salvar: toast + redireciona para listagem
+- Botão "Salvar e criar outro" (futuro)
+
+---
+
+### Tela 3: Categorias Financeiras (`/financial/categories`)
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  💰 Categorias Financeiras                      [+ Nova Categoria]   │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  [Entradas]  [Saídas]    ← tabs para filtrar por tipo                │
+│                                                                      │
+│  ── ENTRADAS ────────────────────────────────────────────────────── │
+│  ┌────────────────────┬──────────────────────┬──────┬──────┬──────┐ │
+│  │ Nome               │ Descrição            │ Uso  │ Tipo │Ações │ │
+│  ├────────────────────┼──────────────────────┼──────┼──────┼──────┤ │
+│  │ Dízimo             │ Contribuição dizimal │  156 │ 🔒   │  ✏️  │ │
+│  │ Oferta             │ Ofertas do culto     │   89 │ 🔒   │  ✏️  │ │
+│  │ Campanha           │ Campanhas especiais  │   12 │ 🔒   │  ✏️  │ │
+│  │ Doação             │ Doações avulsas      │    5 │ 🔒   │  ✏️  │ │
+│  │ Construção Templo  │ Campanha 2026        │    3 │ 🆕   │ ✏️🗑️ │ │
+│  └────────────────────┴──────────────────────┴──────┴──────┴──────┘ │
+│                                                                      │
+│  Coluna "Uso" = quantas transações usam essa categoria               │
+│  🔒 = Sistema   🆕 = Customizada                                    │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Tela 4: Dashboard (`/dashboard`)
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  📊 Dashboard                                    [Período: Abr/2026]│
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐               │
+│  │ 👥 310   │ │📥 28.500 │ │📤 18.200 │ │💵 10.300 │               │
+│  │ Membros  │ │ Entradas │ │ Saídas   │ │ Saldo    │               │
+│  │ ativos   │ │ ▲ 4.8%   │ │ ▲ 4.0%   │ │ ▲ 6.2%   │               │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘               │
+│                                                                      │
+│  ┌───────────────────────────────┐  ┌──────────────────────────────┐│
+│  │  📊 Evolução Mensal           │  │  🥧 Entradas por Categoria   ││
+│  │                               │  │                              ││
+│  │  ████                         │  │      ┌──────┐                ││
+│  │  ████ ████                    │  │  ┌───┤Dízimo├──63%           ││
+│  │  ████ ████ ████               │  │  │   └──────┘                ││
+│  │  ████ ████ ████ ████          │  │  │   Oferta ── 26%           ││
+│  │  Jan  Fev  Mar  Abr           │  │  │   Doação ── 11%           ││
+│  │  ■ Entradas  ■ Saídas         │  │  │                           ││
+│  └───────────────────────────────┘  └──────────────────────────────┘│
+│                                                                      │
+│  ┌───────────────────────────────┐  ┌──────────────────────────────┐│
+│  │  ⛪ Resumo por Congregação    │  │  📋 Últimas Transações       ││
+│  │                               │  │                              ││
+│  │  Sede      +15.000  -12.000   │  │  05/04 Dízimo João    +500  ││
+│  │            saldo: 3.000       │  │  04/04 Aluguel Abr.  -3000  ││
+│  │  Centro    + 8.500  - 4.200   │  │  03/04 Oferta Culto  +1200  ││
+│  │            saldo: 4.300       │  │  02/04 Material Limp.  -180 ││
+│  │  Norte     + 5.000  - 2.000   │  │  01/04 Energia Março  -800  ││
+│  │            saldo: 3.000       │  │                              ││
+│  └───────────────────────────────┘  └──────────────────────────────┘│
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Tela 5: Detalhe da Transação (modal ou página)
+
+```
+┌──────────────────────────────────────────────────────┐
+│  💰 Detalhes da Transação                             │
+│                                                       │
+│  Tipo:           📥 Entrada                           │
+│  Status:         🟢 Confirmado                        │
+│  Categoria:      Dízimo                               │
+│  Valor:          R$ 500,00                            │
+│  Data:           05/04/2026                           │
+│  Pagamento:      PIX                                  │
+│  Congregação:    Sede                                 │
+│  Contribuinte:   João Silva                           │
+│  Descrição:      Dízimo referente a março/2026        │
+│  Comprovante:    PIX-20260401-001                     │
+│                                                       │
+│  ── REGISTRO ──────────────────────────────────────── │
+│  Criado por:     Secretária Maria                     │
+│  Criado em:      05/04/2026 às 09:15                  │
+│  Atualizado em:  05/04/2026 às 09:15                  │
+│                                                       │
+│              [Editar]     [Cancelar Transação]         │
+└──────────────────────────────────────────────────────┘
+```
+
+---
+
+## 10. Indicadores do Dashboard
+
+| # | Indicador | Fonte | Visualização |
+|:-:|-----------|-------|-------------|
+| 1 | **Total de membros ativos** | `GET /api/members/stats` | StatCard com número grande |
+| 2 | **Novos membros no mês** | `GET /api/members/stats` | StatCard com badge |
+| 3 | **Entradas do mês** | `GET /api/dashboard` | StatCard verde + variação % vs mês anterior |
+| 4 | **Saídas do mês** | `GET /api/dashboard` | StatCard vermelho + variação % |
+| 5 | **Saldo do mês** | `GET /api/dashboard` | StatCard azul + variação % |
+| 6 | **Evolução mensal** | `GET /api/financial/summary` | Gráfico de barras: 4 últimos meses, entradas vs saídas |
+| 7 | **Entradas por categoria** | `GET /api/financial/summary` | Gráfico de pizza/donut |
+| 8 | **Resumo por congregação** | `GET /api/financial/summary` | Tabela: CG, entrada, saída, saldo |
+| 9 | **Últimas transações** | `GET /api/dashboard` | Lista resumida dos 5 últimos lançamentos |
+
+---
+
+## Recomendação Técnica Final
+
+> [!TIP]
+> **O módulo financeiro é mais simples do que parece se você respeitar uma regra: é um livro-caixa, não um ERP contábil.** Toda a complexidade de conciliação, plano de contas e relatórios fiscais fica para versões futuras. No MVP:
+>
+> 1. **Lançamentos manuais** — ninguém discute se está correto, o tesoureiro é o responsável
+> 2. **Categorias são rótulos** — não são contas contábeis. "Dízimo" é suficiente sem código contábil
+> 3. **Resumo = SUM + GROUP BY** — não precisa de OLAP, materialização ou cache. Para centenas de registros por mês, queries SQL simples resolvem
+>
+> O endpoint mais complexo é o `GET /api/financial/summary` com seus agregados por categoria e congregação. Tudo cabe em uma query SQL com CTEs.
+
+**Próxima etapa (Etapa 10)** pode ser o último documento de planejamento (telas e fluxo de navegação completo) ou podemos **finalmente começar a codar**. Qual prefere?
