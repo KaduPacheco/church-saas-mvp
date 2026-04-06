@@ -1,25 +1,96 @@
-# 06 - Autenticação e Segurança
+# 06 - Autenticacao e Seguranca
 
-A autenticação é a barreira inicial crítica, especialmente em um sistema Multi-Tenant onde diferentes igrejas operam na mesma infraestrutura isolada logicamente.
+## Visao Geral
+O sistema possui duas trilhas de autenticacao separadas:
 
-## Fluxo de Autenticação na API
+1. Tenant
+- usada pela igreja cliente
+- namespace: `/api/auth/*`
+- token com contexto de tenant
 
-O sistema utiliza arquitetura RESTful sem preservação de sessões server-side (stateless), operando com tokens.
+2. Plataforma / Backoffice
+- usada por operadores internos do SaaS
+- namespace: `/api/backoffice/auth/*`
+- token com contexto de plataforma
 
-1. **Tokens (JWT)**: Todo acesso validado opera neste formato de assinatura via Json Web Token.
-2. **Ciclo Padrão (Módulo Auth)**:
-   - `POST /api/auth/login`: Troca credenciais (E-mail/Senha) e retorna dois tokens principais (AccessToken, RefreshToken). O acesso determina a vida curta de operação, enquanto o refresh permite longa duração silenciada.
-   - `POST /api/auth/refresh`: Atualiza e converte transparentemente o AccessToken utilizando a confirmação de um RefreshToken no banco.
-   - `POST /api/auth/logout`: Elimina do banco/memória o RefreshToken (encerra os acessos garantidos de permanência).
+Essa separacao impede misturar administracao da plataforma com administracao da igreja.
 
-## Camadas e Proteções no Backend (Middlewares)
+## Fluxo Tenant
 
-Nenhuma rota é pública por padrão, salvo os endpoints explícitos de `/register` e `/login` na ponta inicial da API.
+Endpoints:
+- `POST /api/auth/login`
+- `POST /api/auth/refresh`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
 
-- Middleware `authenticate`: Exige a Header de autorização (`Bearer token`) e confere se a assinatura criptográfica concorda com o Secret do ambiente.
-- **Tenant Isolation**: O middleware intercepta a decodificação do Payload, detecta a qual congregação aquele usuário atende e embuti a constante `req.churchId`. Não deve-se depender de Inputs do Cliente (tipo query strings de ID ou JSON bodies) pra checar de qual igreja ele faz operações. Todo comando SQL restringe `WHERE church_id = req.churchId`.
-- **Hashes**: Proteção utilizando salting sobre o texto-plano de senhas, executada pelo pacote utilitário e escalável `bcryptjs`. 
+Claims relevantes:
+- `userId`
+- `churchId`
+- `congregationId`
+- `profileId`
+- `permissions`
 
-## Proteções do Lado Cliente (Frontend Vue)
-- Armazenamento em Estado Persistente da sessão, lidando com transições assíncronas do JWT via **Axios Interceptors**. Caso estoure tempo limite e volte 401 Unauthorized, será acionado debaixo dos panos uma tentativa no `/refresh` e re-envio do pacote ao servidor antes de redirecionar frustrantemente ao formulário de re-login de tela.
-- Vue Router se encarrega nativamente nas Global Guards (beforeEach) de não permitir que áreas da Single-Page-App sejam exibidas (componentes renderizados) enquanto o token de posse no LocalStorage não se conferir válido preliminarmente.
+Middlewares:
+- `authenticate`
+- `tenantIsolation`
+- `authorize`
+
+## Fluxo Backoffice
+
+Endpoints:
+- `POST /api/backoffice/auth/login`
+- `GET /api/backoffice/auth/me`
+
+Claims relevantes:
+- `scope: 'platform'`
+- `platformUserId`
+- `roleId`
+- `roleSlug`
+- `permissions`
+
+Middlewares:
+- `requirePlatformAuth`
+- `requirePlatformPermission`
+
+Importante:
+- o backoffice nao usa `tenantIsolation`
+- o token de plataforma nao depende de `churchId`
+
+## Sessao no Frontend
+
+Tenant:
+- store: `auth.store.js`
+- chaves:
+  - `access_token`
+  - `refresh_token`
+
+Backoffice:
+- store: `backoffice-auth.store.js`
+- chaves:
+  - `backoffice_access_token`
+  - `backoffice_refresh_token`
+
+## Seguranca Minima do MVP
+
+- senhas com `bcryptjs`
+- JWT com expiracao curta
+- refresh token persistido no banco
+- rotas tenant e backoffice com middlewares separados
+- auditoria persistida para acoes criticas do backoffice
+
+## Observacao de Execucao Local
+O frontend usa `http://localhost:4000` como API e o backend aceita `CORS_ORIGIN` configuravel.
+
+Para uso local com Vite na porta padrao:
+- `CORS_ORIGIN=http://localhost:5173`
+
+Se o frontend rodar em outra origem, ajuste `CORS_ORIGIN` de acordo.
+
+## Documentacao relacionada
+- [13 - Backoffice - Autenticacao e Autorizacao](./13-backoffice-autenticacao-e-autorizacao.md)
+- [15 - Backoffice - Frontend](./15-backoffice-frontend.md)
+- [21 - Backoffice - Execucao Local](./21-backoffice-execucao-local.md)
+
+## Limitacao atual do backoffice
+- o backend ja emite refresh token de plataforma e o persiste em `platform_users`
+- o frontend do backoffice ainda nao implementa um fluxo completo de refresh automatico
