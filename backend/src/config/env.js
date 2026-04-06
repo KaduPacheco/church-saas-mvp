@@ -4,6 +4,19 @@
 
 require('dotenv').config();
 
+function parseCorsOrigins(value) {
+  const configuredOrigins = (value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (configuredOrigins.length > 0) {
+    return configuredOrigins;
+  }
+
+  return ['http://localhost:3001', 'http://localhost:5173'];
+}
+
 const requiredVars = [
   'DB_HOST',
   'DB_PORT',
@@ -43,8 +56,15 @@ const env = {
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   },
 
+  platformJwt: {
+    secret: process.env.PLATFORM_JWT_SECRET || process.env.JWT_SECRET,
+    refreshSecret: process.env.PLATFORM_JWT_REFRESH_SECRET || process.env.JWT_REFRESH_SECRET,
+    expiresIn: process.env.PLATFORM_JWT_EXPIRES_IN || process.env.JWT_EXPIRES_IN || '15m',
+    refreshExpiresIn: process.env.PLATFORM_JWT_REFRESH_EXPIRES_IN || process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+  },
+
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origins: parseCorsOrigins(process.env.CORS_ORIGIN),
   },
 };
 

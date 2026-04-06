@@ -29,6 +29,20 @@ const PERMISSIONS = {
   ADMIN_FULL: 'admin:full',
 };
 
+const PLATFORM_PERMISSIONS = {
+  PLATFORM_FULL: 'platform:*',
+  DASHBOARD_READ: 'platform:dashboard:read',
+  TENANTS_READ: 'platform:tenants:read',
+  TENANTS_WRITE: 'platform:tenants:write',
+  CONGREGATIONS_READ: 'platform:congregations:read',
+  USERS_READ: 'platform:users:read',
+  USERS_WRITE: 'platform:users:write',
+  PLATFORM_USERS_READ: 'platform:platform-users:read',
+  PLATFORM_USERS_WRITE: 'platform:platform-users:write',
+  TENANT_INITIAL_ADMIN_WRITE: 'platform:tenant-initial-admin:write',
+  AUDIT_READ: 'platform:audit:read',
+};
+
 // Catálogo agrupado por módulo (usado pelo endpoint GET /profiles/permissions)
 const PERMISSIONS_CATALOG = [
   {
@@ -86,6 +100,7 @@ const PERMISSIONS_CATALOG = [
 
 // Lista plana de todas as permissões válidas (para validação)
 const ALL_PERMISSIONS = Object.values(PERMISSIONS);
+const ALL_PLATFORM_PERMISSIONS = Object.values(PLATFORM_PERMISSIONS);
 
 // ── CARGOS MINISTERIAIS PADRÃO (seeds) ─────────────────────────────
 
@@ -185,8 +200,10 @@ const TRANSACTION_STATUS = ['confirmed', 'pending', 'cancelled'];
 
 module.exports = {
   PERMISSIONS,
+  PLATFORM_PERMISSIONS,
   PERMISSIONS_CATALOG,
   ALL_PERMISSIONS,
+  ALL_PLATFORM_PERMISSIONS,
   SYSTEM_ROLES,
   SYSTEM_PROFILES,
   SYSTEM_FINANCIAL_CATEGORIES,

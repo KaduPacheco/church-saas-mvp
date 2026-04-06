@@ -13,8 +13,43 @@ const errorHandler = require('./middlewares/errorHandler');
 
 // Importar rotas dos módulos
 const authRoutes = require('./modules/auth/auth.routes');
+const backofficeRoutes = require('./modules/backoffice/backoffice.routes');
 
 const app = express();
+
+function normalizeOrigin(origin) {
+  return String(origin || '')
+    .trim()
+    .replace(/\/+$/, '')
+    .toLowerCase();
+}
+
+const allowedOrigins = new Set(env.cors.origins.map(normalizeOrigin));
+
+if (!env.isProduction) {
+  allowedOrigins.add('http://localhost:3001');
+  allowedOrigins.add('http://localhost:5173');
+}
+
+function buildCorsOptions(req, callback) {
+  const requestOrigin = req.header('Origin');
+  const normalizedOrigin = normalizeOrigin(requestOrigin);
+
+  if (!requestOrigin || allowedOrigins.has(normalizedOrigin)) {
+    return callback(null, {
+      origin: requestOrigin || true,
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: req.header('Access-Control-Request-Headers') || [
+        'Content-Type',
+        'Authorization',
+      ],
+      optionsSuccessStatus: 204,
+    });
+  }
+
+  return callback(new Error(`Origem nao permitida pelo CORS: ${requestOrigin}`));
+}
 
 // ── MIDDLEWARES GLOBAIS (ordem importa!) ────────────────────────────
 
@@ -22,12 +57,8 @@ const app = express();
 app.use(helmet());
 
 // CORS: permitir requests do frontend
-app.use(cors({
-  origin: env.cors.origin,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+app.use(cors(buildCorsOptions));
+app.options('*', cors(buildCorsOptions));
 
 // Compressão gzip (reduz tamanho das respostas)
 app.use(compression());
@@ -64,6 +95,7 @@ app.get('/api/health', (_req, res) => {
 // ── ROTAS DOS MÓDULOS ──────────────────────────────────────────────
 
 app.use('/api/auth', authRoutes);
+app.use('/api/backoffice', backofficeRoutes);
 
 // Futuros módulos serão montados aqui:
 // app.use('/api/churches', churchesRoutes);
