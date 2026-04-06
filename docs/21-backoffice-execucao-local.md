@@ -35,10 +35,10 @@ Recomendadas para o backoffice:
 O `.env.example` ja orienta:
 
 ```env
-CORS_ORIGIN=http://localhost:5173
+CORS_ORIGIN=http://localhost:3000
 ```
 
-O codigo de `env.js` ainda usa fallback para `http://localhost:3000` quando a variavel nao existe.
+O codigo de `env.js` usa o mesmo fallback para `http://localhost:3000` quando a variavel nao existe.
 
 Recomendacao pratica:
 - sempre definir `CORS_ORIGIN` explicitamente no `.env`
@@ -85,7 +85,7 @@ Se o backend estiver usando os valores documentados no `.env.example`, o login i
 Essas credenciais sao destinadas apenas ao ambiente local de desenvolvimento.
 
 ## Como acessar o backoffice
-- frontend: `http://localhost:5173/backoffice/login`
+- frontend: `http://localhost:3000/backoffice/login`
 - backend: `http://localhost:4000/api/backoffice`
 - endpoint de login: `POST http://localhost:4000/api/backoffice/auth/login`
 

@@ -26,11 +26,6 @@ function normalizeOrigin(origin) {
 
 const allowedOrigins = new Set(env.cors.origins.map(normalizeOrigin));
 
-if (!env.isProduction) {
-  allowedOrigins.add('http://localhost:3001');
-  allowedOrigins.add('http://localhost:5173');
-}
-
 function buildCorsOptions(req, callback) {
   const requestOrigin = req.header('Origin');
   const normalizedOrigin = normalizeOrigin(requestOrigin);

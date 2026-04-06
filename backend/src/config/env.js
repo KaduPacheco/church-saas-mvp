@@ -14,7 +14,7 @@ function parseCorsOrigins(value) {
     return configuredOrigins;
   }
 
-  return ['http://localhost:3001', 'http://localhost:5173'];
+  return ['http://localhost:3000'];
 }
 
 const requiredVars = [

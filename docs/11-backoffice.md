@@ -30,7 +30,7 @@ O backoffice e a camada administrativa global da plataforma. Ele convive com a a
 - `platform:audit:read`
 
 ## Acesso local de desenvolvimento
-- rota do frontend: `http://localhost:5173/backoffice/login`
+- rota do frontend: `http://localhost:3000/backoffice/login`
 - endpoint de login: `POST http://localhost:4000/api/backoffice/auth/login`
 - e-mail inicial de desenvolvimento: `admin@plataforma.local`
 - senha inicial de desenvolvimento: `change-me-admin-password`

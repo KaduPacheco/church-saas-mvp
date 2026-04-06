@@ -81,10 +81,10 @@ Backoffice:
 ## Observacao de Execucao Local
 O frontend usa `http://localhost:4000` como API e o backend aceita `CORS_ORIGIN` configuravel.
 
-Para uso local com Vite na porta padrao:
-- `CORS_ORIGIN=http://localhost:5173`
-
-Se o frontend rodar em outra origem, ajuste `CORS_ORIGIN` de acordo.
+Para uso local padronizado:
+- frontend principal: `http://localhost:3000`
+- backoffice: `http://localhost:3000/backoffice/login`
+- `CORS_ORIGIN=http://localhost:3000`
 
 ## Documentacao relacionada
 - [13 - Backoffice - Autenticacao e Autorizacao](./13-backoffice-autenticacao-e-autorizacao.md)
