@@ -48,6 +48,7 @@ Esse fluxo:
 - cria a base inicial do tenant
 - cria a conta em `users`
 - vincula o usuario ao `church_id` correto
+- usa `initialAdminEmail` como e-mail de login do tenant
 - usa automaticamente o perfil `Administrador Geral`
 - cria a conta com `congregation_id = null`
 - cria a conta com `member_id = null`
@@ -167,6 +168,10 @@ A criacao rotineira dos demais usuarios internos continua fora desta aba.
 6. sistema cria a base inicial do tenant
 7. sistema cria o primeiro usuario em `users`
 8. sistema registra auditoria do onboarding
+
+Observacao importante:
+- o login do tenant usa o e-mail informado para o admin inicial
+- o e-mail institucional da igreja nao faz login por si so, a menos que o operador informe o mesmo valor nos dois campos
 
 ## Auditoria
 

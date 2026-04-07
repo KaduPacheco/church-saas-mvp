@@ -35,6 +35,24 @@ A igreja sede nasce em `churches` e funciona como raiz do tenant. O admin inicia
 - `member_id = null`
 - `permission_profile_id` do perfil tecnico `Administrador Geral`
 
+## Como o admin inicial faz login
+O admin inicial do tenant e salvo em `users` e autentica em:
+- `POST /api/auth/login`
+
+Esse login usa exatamente:
+- o `email` salvo para o admin inicial em `users`
+- o `password_hash` salvo para esse mesmo usuario
+
+Importante:
+- o e-mail institucional da igreja em `churches.email` nao e, por regra, o e-mail de login
+- no onboarding do backoffice, `churchEmail` e `initialAdminEmail` podem ser diferentes
+- se o operador tentar entrar com o e-mail da igreja quando o admin inicial foi salvo com outro e-mail, o tenant login respondera `401 Credenciais invalidas`
+
+Exemplo real auditado no ambiente local:
+- igreja cliente: `batista@teste.com`
+- admin inicial salvo em `users`: `coelho@teste.com`
+- login correto do tenant: `coelho@teste.com`
+
 ## O que o backoffice cria
 No fluxo implementado em `POST /api/backoffice/tenants`, o backoffice cria:
 
@@ -70,6 +88,7 @@ O backoffice tambem nao deve:
 
 ### Parcialmente implementado
 - `POST /api/auth/register` continua existindo por compatibilidade e reaproveita a mesma logica de onboarding
+- `POST /api/auth/register` continua usando um unico `email` tanto para a igreja quanto para o admin inicial, diferente do onboarding do backoffice, que aceita `churchEmail` e `initialAdminEmail` separados
 
 ### Proposto
 - fluxo completo de gestao de usuarios internos no painel da igreja

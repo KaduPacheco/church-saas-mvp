@@ -73,6 +73,7 @@ async function handleSubmit() {
       <ul>
         <li>A igreja cliente nasce em `churches` como sede do tenant.</li>
         <li>O admin inicial nasce junto, com perfil tecnico `Administrador Geral`.</li>
+        <li>O login do tenant usa o e-mail do admin inicial, nao o e-mail institucional da igreja, salvo se ambos forem iguais.</li>
         <li>Membro e cargo ministerial nao fazem parte deste cadastro inicial.</li>
         <li>Depois do onboarding, a propria igreja passa a administrar os demais usuarios.</li>
       </ul>
@@ -84,6 +85,12 @@ async function handleSubmit() {
 
     <div v-if="successMessage" class="feedback success">
       <p>{{ successMessage }}</p>
+      <p v-if="createdTenant?.initialAdmin?.email" class="credential-summary">
+        Login do tenant: <strong>{{ createdTenant.initialAdmin.email }}</strong>
+      </p>
+      <p class="credential-summary">
+        A senha de acesso e exatamente a senha informada no campo `Senha inicial` deste onboarding.
+      </p>
       <RouterLink
         v-if="createdTenant?.tenant?.id"
         class="detail-link"
@@ -121,6 +128,9 @@ async function handleSubmit() {
               type="email"
               placeholder="contato@igreja.com"
             />
+            <span class="field-hint">
+              Esse e-mail identifica a igreja cliente. Ele so sera usado para login se voce repetir o mesmo valor no admin inicial.
+            </span>
           </div>
 
           <div class="field">
@@ -185,6 +195,9 @@ async function handleSubmit() {
               type="email"
               placeholder="admin@igreja.com"
             />
+            <span class="field-hint">
+              Este e o e-mail que entra em `/auth/login` no painel do tenant.
+            </span>
           </div>
 
           <div class="field">
@@ -277,6 +290,10 @@ async function handleSubmit() {
   margin: 0;
 }
 
+.credential-summary + .credential-summary {
+  margin-top: 0.45rem;
+}
+
 .detail-link {
   display: inline-flex;
   align-items: center;
@@ -317,6 +334,12 @@ async function handleSubmit() {
   color: #334155;
   font-size: 0.9rem;
   font-weight: 600;
+}
+
+.field-hint {
+  color: #64748b;
+  font-size: 0.8rem;
+  line-height: 1.5;
 }
 
 .field input {
