@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const controller = require('./backoffice-tenants.controller');
 const {
+  createTenantOnboardingValidation,
   listTenantsValidation,
   tenantIdValidation,
   updateTenantStatusValidation,
@@ -12,6 +13,16 @@ const requirePlatformPermission = require('../../../middlewares/requirePlatformP
 const { PLATFORM_PERMISSIONS } = require('../../../config/constants');
 
 const router = Router();
+
+router.post(
+  '/',
+  requirePlatformAuth,
+  requirePlatformPermission(PLATFORM_PERMISSIONS.TENANTS_WRITE),
+  requirePlatformPermission(PLATFORM_PERMISSIONS.TENANT_INITIAL_ADMIN_WRITE),
+  createTenantOnboardingValidation,
+  validate,
+  controller.createTenantOnboarding
+);
 
 router.get(
   '/',

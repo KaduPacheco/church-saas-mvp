@@ -9,9 +9,6 @@ const {
   createPlatformUserValidation,
   updatePlatformUserValidation,
   updatePlatformUserStatusValidation,
-  listEligibleTenantsValidation,
-  tenantIdValidation,
-  provisionTenantInitialAdminValidation,
 } = require('./backoffice-users.validation');
 
 const router = Router();
@@ -63,33 +60,6 @@ router.patch(
   updatePlatformUserStatusValidation,
   validate,
   controller.updatePlatformUserStatus
-);
-
-router.get(
-  '/tenant-initial-admin/eligible-tenants',
-  requirePlatformAuth,
-  requirePlatformPermission(PLATFORM_PERMISSIONS.TENANT_INITIAL_ADMIN_WRITE),
-  listEligibleTenantsValidation,
-  validate,
-  controller.listEligibleTenants
-);
-
-router.get(
-  '/tenant-initial-admin/tenants/:tenantId/profiles',
-  requirePlatformAuth,
-  requirePlatformPermission(PLATFORM_PERMISSIONS.TENANT_INITIAL_ADMIN_WRITE),
-  tenantIdValidation,
-  validate,
-  controller.listTenantInitialAdminProfiles
-);
-
-router.post(
-  '/tenant-initial-admin',
-  requirePlatformAuth,
-  requirePlatformPermission(PLATFORM_PERMISSIONS.TENANT_INITIAL_ADMIN_WRITE),
-  provisionTenantInitialAdminValidation,
-  validate,
-  controller.provisionTenantInitialAdmin
 );
 
 module.exports = router;

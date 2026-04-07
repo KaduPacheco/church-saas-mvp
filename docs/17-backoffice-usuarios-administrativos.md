@@ -14,6 +14,8 @@ No estado atual do projeto, "usuario administrativo do tenant" significa o regis
 
 O backoffice nao cria um novo tipo de usuario tenant. Ele apenas supervisiona os usuarios tecnicos ja existentes.
 
+No fluxo recomendado atual, a primeira conta da igreja nasce durante o onboarding do tenant.
+
 ## Endpoints implementados
 - `GET /api/backoffice/tenants/:id/users`
 - `PATCH /api/backoffice/tenants/:id/users/:userId/status`
@@ -67,7 +69,7 @@ E registra auditoria:
 - reset de senha
 - redefinicao de acesso
 - troca de perfil tecnico
-- criacao ou remocao de usuario
+- criacao rotineira ou remocao de usuario
 - gestao ministerial
 
 ## Separacao entre supervisao e gestao interna
@@ -117,3 +119,4 @@ Content-Type: application/json
 - nao existe filtro dedicado para mostrar apenas certos perfis
 - o frontend atual mostra usuarios dentro do detalhe do tenant, nao em modulo separado
 - a criacao rotineira de usuarios internos do tenant continua fora do backoffice e deve acontecer no painel da igreja
+- o backoffice deve usar onboarding controlado para novas igrejas, em vez de criar admins isolados como fluxo principal

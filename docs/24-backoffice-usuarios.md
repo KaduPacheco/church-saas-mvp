@@ -1,22 +1,24 @@
 # 24 - Backoffice - Usuarios
 
 ## Objetivo
-Documentar a nova aba `Usuarios` do backoffice, deixando explicito:
+Documentar a aba `Usuarios` do backoffice deixando explicito:
 
 - quais contas pertencem a plataforma
-- quais contas pertencem ao tenant
-- qual fluxo pode ser executado pelo backoffice
+- onde acontece o onboarding correto do tenant
 - quais limites continuam protegendo a area operacional da igreja
 
-Este documento reflete apenas o que esta implementado no codigo atual.
+Este documento reflete o que esta implementado no codigo atual.
 
 ## Visao geral da aba
-A aba `Usuarios` foi criada no backoffice para tratar duas frentes administrativas diferentes, sem misturar conceitos:
+A aba `Usuarios` trata duas frentes administrativas diferentes:
 
 1. `Usuarios da plataforma`
-2. `Admin inicial do tenant`
+2. `Onboarding do tenant`
 
-Essa separacao segue a definicao registrada em `23-fluxo-de-criacao-de-usuarios.md`.
+Essa separacao preserva a arquitetura do sistema:
+- `platform_users` operam o SaaS
+- `users` operam a igreja cliente
+- o backoffice nao vira modulo rotineiro de usuarios internos da igreja
 
 ## O que a aba faz
 
@@ -35,16 +37,18 @@ Essas contas:
 - acessam o backoffice
 - nao sao usuarios da igreja
 
-### Frente B - Admin inicial do tenant
+### Frente B - Onboarding do tenant
 Permite:
-- selecionar uma igreja cliente elegivel
-- consultar os perfis tecnicos ativos da igreja
-- provisionar o primeiro administrador da igreja
+- criar a igreja cliente no backoffice
+- criar o admin inicial do tenant na mesma operacao
+- registrar o nascimento do tenant com vinculo tecnico correto
 
 Esse fluxo:
+- cria a igreja sede em `churches`
+- cria a base inicial do tenant
 - cria a conta em `users`
 - vincula o usuario ao `church_id` correto
-- usa `permission_profile_id`
+- usa automaticamente o perfil `Administrador Geral`
 - cria a conta com `congregation_id = null`
 - cria a conta com `member_id = null`
 
@@ -64,25 +68,31 @@ Esse fluxo:
 ### Arquivos principais
 - `frontend/src/views/backoffice/BackofficeUsersView.vue`
 - `frontend/src/components/backoffice/users/PlatformUsersSection.vue`
-- `frontend/src/components/backoffice/users/TenantInitialAdminSection.vue`
+- `frontend/src/components/backoffice/users/TenantOnboardingSection.vue`
 - `frontend/src/services/backoffice-users.service.js`
+- `frontend/src/services/backoffice-tenants.service.js`
 
 ### Integracao com layout
-A navegacao lateral do backoffice ganhou a entrada:
+A navegacao lateral do backoffice continua com a entrada:
 - `Usuarios`
 
-Essa entrada aparece somente quando o operador possui pelo menos uma das permissoes ligadas a essa pagina.
+Essa entrada aparece quando o operador possui pelo menos uma das permissoes ligadas a essa pagina.
 
 ## Estrutura no backend
 
-### Namespace
+### Namespaces
 - `/api/backoffice/users/*`
+- `/api/backoffice/tenants`
 
 ### Arquivos principais
 - `backend/src/modules/backoffice/users/backoffice-users.routes.js`
 - `backend/src/modules/backoffice/users/backoffice-users.controller.js`
 - `backend/src/modules/backoffice/users/backoffice-users.service.js`
 - `backend/src/modules/backoffice/users/backoffice-users.validation.js`
+- `backend/src/modules/backoffice/tenants/backoffice-tenants.routes.js`
+- `backend/src/modules/backoffice/tenants/backoffice-tenants.controller.js`
+- `backend/src/modules/backoffice/tenants/backoffice-tenants.service.js`
+- `backend/src/modules/tenants/tenant-onboarding.service.js`
 
 ## Endpoints implementados
 
@@ -93,23 +103,22 @@ Essa entrada aparece somente quando o operador possui pelo menos uma das permiss
 - `PATCH /api/backoffice/users/platform/:id`
 - `PATCH /api/backoffice/users/platform/:id/status`
 
-### Admin inicial do tenant
-- `GET /api/backoffice/users/tenant-initial-admin/eligible-tenants`
-- `GET /api/backoffice/users/tenant-initial-admin/tenants/:tenantId/profiles`
-- `POST /api/backoffice/users/tenant-initial-admin`
+### Onboarding do tenant
+- `POST /api/backoffice/tenants`
 
 ## Permissoes de plataforma usadas
 
-### Novas permissoes especificas da aba
+### Permissoes especificas da aba
 - `platform:platform-users:read`
 - `platform:platform-users:write`
 - `platform:tenant-initial-admin:write`
 
-### Permissoes antigas preservadas
+### Permissoes complementares
+- `platform:tenants:write`
 - `platform:users:read`
 - `platform:users:write`
 
-Essas permissoes continuam ligadas a supervisao de usuarios do tenant no detalhe da igreja cliente e nao foram reutilizadas para o CRUD de `platform_users`.
+As permissoes `platform:users:*` continuam ligadas a supervisao dos usuarios do tenant no detalhe da igreja cliente e nao foram reutilizadas para o CRUD de `platform_users`.
 
 ## Regras de negocio aplicadas
 
@@ -118,13 +127,13 @@ O CRUD de usuarios da plataforma atua apenas em:
 - `platform_users`
 
 ### 2. Usuario da igreja nao acessa o backoffice por padrao
-O provisionamento do admin inicial cria conta em:
+O onboarding do tenant cria a primeira conta em:
 - `users`
 
 Essa conta continua pertencendo ao tenant e nao recebe acesso de plataforma.
 
 ### 3. Cargo ministerial nao define permissao tecnica
-O fluxo de `Admin inicial do tenant` nao usa:
+O onboarding do tenant nao usa:
 - `roles`
 - `member_id`
 
@@ -135,10 +144,9 @@ O acesso tecnico e definido apenas por:
 O fluxo nao cria membros nem faz vinculo automatico com `users.member_id`.
 
 ### 5. O backoffice nao vira modulo comum de usuarios do tenant
-Para reduzir risco conceitual, o fluxo de `admin inicial do tenant` aceita apenas igrejas que ainda nao possuam usuarios.
+O backoffice usa a permissao de onboarding para criar a igreja cliente e seu admin inicial juntos.
 
-No estado atual, a elegibilidade e:
-- tenant sem nenhum registro em `users`
+A criacao rotineira dos demais usuarios internos continua fora desta aba.
 
 ## Fluxo implementado para usuarios da plataforma
 
@@ -149,16 +157,16 @@ No estado atual, a elegibilidade e:
 5. pode ativar ou inativar conta
 6. o sistema grava auditoria
 
-## Fluxo implementado para admin inicial do tenant
+## Fluxo implementado para onboarding do tenant
 
 1. operador acessa a aba `Usuarios`
-2. seleciona `Admin inicial do tenant`
-3. consulta igrejas elegiveis
-4. escolhe a igreja cliente
-5. escolhe o perfil tecnico inicial
-6. informa nome, e-mail e senha
+2. seleciona `Onboarding do tenant`
+3. informa os dados da igreja sede
+4. informa os dados do admin inicial
+5. sistema cria a igreja cliente em `churches`
+6. sistema cria a base inicial do tenant
 7. sistema cria o primeiro usuario em `users`
-8. sistema registra auditoria
+8. sistema registra auditoria do onboarding
 
 ## Auditoria
 
@@ -166,7 +174,7 @@ No estado atual, a elegibilidade e:
 - `platform.platform_user.created`
 - `platform.platform_user.updated`
 - `platform.platform_user.status.updated`
-- `platform.tenant.initial_admin.provisioned`
+- `platform.tenant.onboarded`
 
 ### Campos principais registrados
 - ator da plataforma
@@ -176,30 +184,20 @@ No estado atual, a elegibilidade e:
 - metadados minimos da alteracao
 
 ## Integracao com a documentacao existente
-Esta nova aba complementa:
+Esta aba complementa:
 
 - `17-backoffice-usuarios-administrativos.md`
 - `23-fluxo-de-criacao-de-usuarios.md`
-
-Relacao entre os documentos:
-
-- `24-backoffice-usuarios.md`
-  - explica a aba de usuarios do backoffice
-- `17-backoffice-usuarios-administrativos.md`
-  - explica a supervisao dos usuarios do tenant
-- `23-fluxo-de-criacao-de-usuarios.md`
-  - define quem cria quem no sistema
+- `25-fluxo-de-onboarding-do-tenant.md`
 
 ## Limitacoes atuais
-- a aba ainda nao cria tenants
-- a criacao do admin inicial funciona apenas para igrejas sem usuarios
-- a logica de onboarding ainda nao foi extraida de `/api/auth/register`
+- `POST /api/auth/register` continua existindo como fluxo legado reaproveitando a mesma logica de onboarding
 - nao existe reset de senha para usuarios da plataforma nem do tenant
 - a gestao de usuarios internos do tenant continua fora desta aba
 
 ## Proximo passo recomendado
 O proximo refinamento arquitetural recomendado e:
 
-1. extrair a logica de onboarding de tenant para um servico reutilizavel
-2. implementar a criacao completa de tenant + admin inicial no backoffice
-3. manter a criacao dos demais usuarios internos no painel da igreja
+1. implementar a gestao de usuarios internos no painel da igreja
+2. adicionar reset de acesso com auditoria
+3. manter o onboarding do tenant como responsabilidade do backoffice

@@ -1,9 +1,11 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { backofficeTenantsService } from '@/services/backoffice-tenants.service'
+import { useBackofficeAuthStore } from '@/stores/backoffice-auth.store'
 import { getStatusLabel } from '@/utils/backoffice-labels'
 
+const backofficeAuthStore = useBackofficeAuthStore()
 const loading = ref(true)
 const errorMessage = ref('')
 const tenants = ref([])
@@ -20,6 +22,11 @@ const filters = reactive({
   page: 1,
   perPage: 10,
 })
+
+const canStartOnboarding = computed(() =>
+  backofficeAuthStore.hasPermission('platform:tenants:write') &&
+  backofficeAuthStore.hasPermission('platform:tenant-initial-admin:write')
+)
 
 async function loadTenants() {
   loading.value = true
@@ -64,8 +71,19 @@ onMounted(() => {
       <div>
         <span class="eyebrow">Gestão de Igrejas Clientes</span>
         <h2>Igrejas clientes</h2>
-        <p>Consulte as igrejas sede cadastradas e acompanhe seus dados principais.</p>
+        <p>
+          Consulte as igrejas sede cadastradas e acompanhe seus dados principais. Novas igrejas
+          devem nascer pelo onboarding controlado com admin inicial junto.
+        </p>
       </div>
+
+      <RouterLink
+        v-if="canStartOnboarding"
+        class="detail-link"
+        :to="{ name: 'backoffice-users', query: { tab: 'tenant-onboarding' } }"
+      >
+        Novo onboarding
+      </RouterLink>
     </div>
 
     <form class="filters-card" @submit.prevent="handleSearch">
@@ -190,6 +208,13 @@ onMounted(() => {
   font-size: 0.8rem;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .page-header h2 {
@@ -367,8 +392,10 @@ onMounted(() => {
     grid-template-columns: 1fr;
   }
 
+  .page-header,
   .pagination {
     flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>

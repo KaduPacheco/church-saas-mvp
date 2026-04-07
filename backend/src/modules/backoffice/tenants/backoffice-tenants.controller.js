@@ -1,6 +1,21 @@
 const backofficeTenantsService = require('./backoffice-tenants.service');
 const response = require('../../../utils/response');
 
+async function createTenantOnboarding(req, res, next) {
+  try {
+    const result = await backofficeTenantsService.createTenantOnboarding({
+      ...req.body,
+      actorPlatformUserId: req.platformUser.userId,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+
+    return response.created(res, result);
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function listTenants(req, res, next) {
   try {
     const result = await backofficeTenantsService.listTenants(req.query);
@@ -71,6 +86,7 @@ async function updateTenantUserStatus(req, res, next) {
 }
 
 module.exports = {
+  createTenantOnboarding,
   listTenants,
   getTenantById,
   updateTenantStatus,

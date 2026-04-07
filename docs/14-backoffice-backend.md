@@ -37,6 +37,7 @@ O padrao segue a estrutura usada no restante do backend:
 - `GET /api/backoffice/dashboard/summary`
 
 ### Tenants
+- `POST /api/backoffice/tenants`
 - `GET /api/backoffice/tenants`
 - `GET /api/backoffice/tenants/:id`
 - `GET /api/backoffice/tenants/:id/congregations`
@@ -53,9 +54,6 @@ O padrao segue a estrutura usada no restante do backend:
 - `POST /api/backoffice/users/platform`
 - `PATCH /api/backoffice/users/platform/:id`
 - `PATCH /api/backoffice/users/platform/:id/status`
-- `GET /api/backoffice/users/tenant-initial-admin/eligible-tenants`
-- `GET /api/backoffice/users/tenant-initial-admin/tenants/:tenantId/profiles`
-- `POST /api/backoffice/users/tenant-initial-admin`
 
 ## Responsabilidades por modulo
 
@@ -68,6 +66,7 @@ O padrao segue a estrutura usada no restante do backend:
 - agregacao de totais globais em `churches`, `congregations`, `users` e `members`
 
 ### Tenants
+- onboarding transacional de igreja cliente + admin inicial
 - listagem paginada de igrejas sede
 - filtro por busca e status
 - detalhe consolidado do tenant
@@ -85,7 +84,6 @@ O padrao segue a estrutura usada no restante do backend:
 - listagem de papeis da plataforma
 - criacao e edicao de `platform_users`
 - ativacao e inativacao de usuarios da plataforma
-- provisionamento controlado do admin inicial do tenant
 
 ## Validacoes
 O backoffice usa `express-validator` e middleware `validate`.
@@ -99,7 +97,7 @@ Validacoes presentes no codigo:
 - filtros da consulta de auditoria
 - filtros de listagem de usuarios da plataforma
 - criacao e edicao de usuarios da plataforma
-- provisionamento do admin inicial do tenant
+- onboarding do tenant
 
 ## Tratamento de erros
 O backoffice reaproveita o pipeline global do backend:
@@ -156,4 +154,4 @@ Content-Type: application/json
 - nao ha refresh token de backoffice exposto por endpoint dedicado no codigo atual
 - nao ha modulo de edicao de papeis/permissoes de plataforma
 - nao ha exportacao de auditoria
-- o fluxo de criacao do admin inicial do tenant nao cria o tenant; ele apenas provisiona a primeira conta para igrejas ja existentes e sem usuarios
+- `POST /api/auth/register` continua existindo como fluxo legado reaproveitando a mesma logica de onboarding

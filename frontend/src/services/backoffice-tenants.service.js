@@ -1,6 +1,10 @@
 import { backofficeApi } from './backoffice-api'
 
 export const backofficeTenantsService = {
+  createOnboarding(payload) {
+    return backofficeApi.post('/tenants', payload)
+  },
+
   list(params = {}) {
     return backofficeApi.get('/tenants', { params })
   },

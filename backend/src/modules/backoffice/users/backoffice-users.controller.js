@@ -66,46 +66,10 @@ async function updatePlatformUserStatus(req, res, next) {
   }
 }
 
-async function listEligibleTenants(req, res, next) {
-  try {
-    const result = await backofficeUsersService.listEligibleTenants(req.query);
-    return response.success(res, result);
-  } catch (error) {
-    next(error);
-  }
-}
-
-async function listTenantInitialAdminProfiles(req, res, next) {
-  try {
-    const result = await backofficeUsersService.listTenantInitialAdminProfiles(req.params.tenantId);
-    return response.success(res, result);
-  } catch (error) {
-    next(error);
-  }
-}
-
-async function provisionTenantInitialAdmin(req, res, next) {
-  try {
-    const result = await backofficeUsersService.provisionTenantInitialAdmin({
-      ...req.body,
-      actorPlatformUserId: req.platformUser.userId,
-      ipAddress: req.ip,
-      userAgent: req.get('user-agent'),
-    });
-
-    return response.created(res, result);
-  } catch (error) {
-    next(error);
-  }
-}
-
 module.exports = {
   listPlatformUsers,
   listPlatformRoles,
   createPlatformUser,
   updatePlatformUser,
   updatePlatformUserStatus,
-  listEligibleTenants,
-  listTenantInitialAdminProfiles,
-  provisionTenantInitialAdmin,
 };
