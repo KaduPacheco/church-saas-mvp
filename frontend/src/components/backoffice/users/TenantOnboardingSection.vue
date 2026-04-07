@@ -1,7 +1,10 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { backofficeTenantsService } from '@/services/backoffice-tenants.service'
+import {
+  backofficeTenantsService,
+  getBackofficeTenantsErrorMessage,
+} from '@/services/backoffice-tenants.service'
 
 const saving = ref(false)
 const errorMessage = ref('')
@@ -34,7 +37,7 @@ async function handleSubmit() {
   successMessage.value = ''
 
   try {
-    const response = await backofficeTenantsService.createOnboarding({
+    const response = await backofficeTenantsService.createTenantOnboarding({
       churchName: form.churchName,
       churchEmail: form.churchEmail,
       churchPhone: form.churchPhone || undefined,
@@ -45,11 +48,13 @@ async function handleSubmit() {
     })
 
     createdTenant.value = response.data
-    successMessage.value = `Igreja cliente e admin inicial criados com sucesso para ${response.data.tenant.name}.`
+    successMessage.value = `Onboarding concluido com sucesso para a igreja cliente ${response.data.tenant.name}.`
     resetForm()
   } catch (error) {
-    errorMessage.value =
-      error.message || 'Nao foi possivel concluir o onboarding da igreja cliente.'
+    errorMessage.value = getBackofficeTenantsErrorMessage(
+      error,
+      'Nao foi possivel concluir o onboarding da igreja cliente.'
+    )
   } finally {
     saving.value = false
   }
@@ -60,22 +65,25 @@ async function handleSubmit() {
   <section class="tenant-onboarding-section">
     <div class="section-header">
       <div>
-        <h3>Onboarding do tenant</h3>
+        <span class="eyebrow">Nova igreja cliente</span>
+        <h3>Onboarding de tenant</h3>
         <p>
-          O backoffice cria primeiro a igreja sede e, na mesma operacao, cria o admin inicial
-          vinculado ao tenant correto.
+          Este fluxo cria a igreja cliente e, no mesmo processo, provisiona o admin inicial
+          que vai inaugurar o acesso tecnico do tenant.
         </p>
       </div>
     </div>
 
     <section class="info-card">
-      <h4>Fluxo adotado</h4>
+      <h4>Quando usar esta tela</h4>
       <ul>
+        <li>Use esta tela apenas para criar uma nova igreja cliente com seu primeiro acesso tecnico.</li>
+        <li>Esse nao e o fluxo rotineiro de criacao de usuarios internos do tenant.</li>
         <li>A igreja cliente nasce em `churches` como sede do tenant.</li>
         <li>O admin inicial nasce junto, com perfil tecnico `Administrador Geral`.</li>
         <li>O login do tenant usa o e-mail do admin inicial, nao o e-mail institucional da igreja, salvo se ambos forem iguais.</li>
-        <li>Membro e cargo ministerial nao fazem parte deste cadastro inicial.</li>
-        <li>Depois do onboarding, a propria igreja passa a administrar os demais usuarios.</li>
+        <li>Membros e cargos ministeriais continuam separados do acesso tecnico.</li>
+        <li>Depois do onboarding, a propria igreja passa a administrar os demais usuarios no painel do tenant.</li>
       </ul>
     </section>
 
@@ -86,10 +94,11 @@ async function handleSubmit() {
     <div v-if="successMessage" class="feedback success">
       <p>{{ successMessage }}</p>
       <p v-if="createdTenant?.initialAdmin?.email" class="credential-summary">
-        Login do tenant: <strong>{{ createdTenant.initialAdmin.email }}</strong>
+        Login inicial do tenant: <strong>{{ createdTenant.initialAdmin.email }}</strong>
       </p>
       <p class="credential-summary">
-        A senha de acesso e exatamente a senha informada no campo `Senha inicial` deste onboarding.
+        Nenhum token foi emitido pelo backoffice. A senha de acesso e exatamente a senha
+        informada no campo `Senha inicial` deste onboarding.
       </p>
       <RouterLink
         v-if="createdTenant?.tenant?.id"
@@ -105,7 +114,7 @@ async function handleSubmit() {
         <div class="card-header">
           <div>
             <h4>Igreja cliente</h4>
-            <p>Dados minimos da igreja sede que dara origem ao tenant.</p>
+            <p>Dados da igreja sede que dara origem ao novo tenant na plataforma.</p>
           </div>
         </div>
 
@@ -155,12 +164,12 @@ async function handleSubmit() {
 
           <div class="field readonly-field">
             <label>Status inicial</label>
-            <div class="readonly-value">Ativo</div>
+            <div class="readonly-value">Ativo no tenant novo</div>
           </div>
 
           <div class="field readonly-field">
             <label>Plano inicial</label>
-            <div class="readonly-value">free</div>
+            <div class="readonly-value">free (padrao atual do onboarding)</div>
           </div>
         </div>
       </section>
@@ -170,8 +179,7 @@ async function handleSubmit() {
           <div>
             <h4>Admin inicial do tenant</h4>
             <p>
-              Esta conta nasce ja vinculada a igreja sede criada acima e inaugura a gestao
-              tecnica da propria igreja.
+              Esta conta nasce junto com a igreja cliente e inaugura a gestao tecnica do tenant.
             </p>
           </div>
         </div>
@@ -196,7 +204,7 @@ async function handleSubmit() {
               placeholder="admin@igreja.com"
             />
             <span class="field-hint">
-              Este e o e-mail que entra em `/auth/login` no painel do tenant.
+              Este e o e-mail que entra em `/api/auth/login` no painel do tenant.
             </span>
           </div>
 
@@ -223,7 +231,7 @@ async function handleSubmit() {
           <div class="field readonly-field">
             <label>Regra de negocio</label>
             <div class="readonly-value">
-              Membro e cargo ministerial permanecem separados do acesso tecnico.
+              Usuario da plataforma, usuario do tenant, membro e cargo ministerial permanecem separados.
             </div>
           </div>
         </div>
@@ -231,7 +239,7 @@ async function handleSubmit() {
 
       <div class="form-actions">
         <button class="primary-button" type="submit" :disabled="saving">
-          {{ saving ? 'Criando onboarding...' : 'Criar igreja cliente e admin inicial' }}
+          {{ saving ? 'Criando tenant...' : 'Criar igreja cliente e admin inicial' }}
         </button>
       </div>
     </form>
@@ -250,6 +258,15 @@ async function handleSubmit() {
 .form-card h4 {
   margin: 0 0 0.35rem;
   color: #0f172a;
+}
+
+.eyebrow {
+  display: inline-block;
+  margin-bottom: 0.55rem;
+  color: #0f766e;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .section-header p,

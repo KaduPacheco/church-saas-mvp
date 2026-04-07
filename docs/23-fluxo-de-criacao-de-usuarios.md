@@ -1,20 +1,20 @@
 # 23 - Fluxo de Criacao de Usuarios
 
 ## Objetivo
-Definir com clareza quem cria cada tipo de usuario no sistema, em que momento isso acontece e como a separacao entre plataforma, tenant, membro e cargo ministerial deve ser preservada.
+Registrar quem cria cada tipo de usuario no projeto, onde essa criacao acontece e como a separacao entre plataforma, tenant, membro e cargo ministerial permanece preservada no estado real atual do codigo.
 
-Este documento foi ajustado com base no codigo real atual e diferencia:
-- o que esta implementado
-- o que esta parcialmente implementado
-- o que continua proposto
+Este documento diferencia:
+- implementado
+- parcialmente implementado
+- proposto
 
 ## Resumo executivo
-O modelo adotado no projeto e:
+O modelo atual consolidado e:
 
-- o backoffice cria:
-  - tenant
-  - admin inicial do tenant
-- o tenant cria:
+- a plataforma/backoffice cria:
+  - a igreja cliente
+  - o admin inicial do tenant
+- o tenant cria depois:
   - os demais usuarios internos
 - o modulo de membros cria:
   - membros
@@ -22,11 +22,11 @@ O modelo adotado no projeto e:
   - cargos ministeriais
 
 Regras centrais:
-- usuario de plataforma nao e usuario da igreja
-- usuario da igreja nao acessa o backoffice por padrao
+- `platform_users` nao se mistura com `users`
+- `users` nao se mistura com `members`
+- `roles` nao substitui `permission_profiles`
 - membro nao vira usuario automaticamente
 - cargo ministerial nao concede permissao tecnica sozinho
-- vinculo entre usuario e membro e opcional
 
 ## Camadas conceituais
 
@@ -39,26 +39,26 @@ Modelagem atual:
 
 Status:
 - autenticacao: implementado
-- seed/bootstrap inicial: implementado
-- criacao por interface administrativa: implementado
+- criacao pelo backoffice: implementado
+- edicao e ativacao/inativacao: implementado
 
 ### Camada 2 - Usuarios do tenant
-Representam contas tecnicas usadas no painel operacional da igreja.
+Representam contas tecnicas do painel operacional da igreja.
 
 Modelagem atual:
 - tabela `users`
 - tabela `permission_profiles`
-- vinculo obrigatorio com `church_id`
-- vinculo opcional com `congregation_id`
-- vinculo opcional com `member_id`
+- `church_id` obrigatorio
+- `congregation_id` opcional
+- `member_id` opcional
 
 Status:
 - autenticacao: implementado
-- criacao do admin inicial no onboarding do backoffice: implementado
-- criacao de usuarios adicionais pelo painel da igreja: proposto
+- criacao do admin inicial no onboarding: implementado
+- criacao de usuarios adicionais pelo tenant: proposto
 
 ### Camada 3 - Dominio ministerial e eclesiastico
-Representa a estrutura real da igreja sem governar sozinha o acesso tecnico ao sistema.
+Representa a estrutura real da igreja sem controlar sozinha o acesso tecnico.
 
 Modelagem atual:
 - tabela `members`
@@ -66,49 +66,68 @@ Modelagem atual:
 
 Status:
 - modelagem separada: implementado
-- vinculo opcional com usuario: parcialmente implementado
+- vinculo opcional usuario-membro: parcialmente implementado
 
-## Como o sistema esta hoje
+## Estado anterior
+Antes da consolidacao atual, o onboarding do tenant estava acoplado ao fluxo de registro em:
 
-### O que ja existe no codigo
-- `POST /api/backoffice/tenants` cria:
-  - tenant em `churches`
-  - cargos ministeriais padrao em `roles`
-  - perfis tecnicos padrao em `permission_profiles`
-  - categorias financeiras padrao
-  - primeiro admin do tenant em `users`
-- `POST /api/auth/register` continua existindo por compatibilidade e reaproveita a mesma logica de onboarding
-- `POST /api/backoffice/auth/login` autentica `platform_users`
-- o backoffice consegue:
-  - listar tenants
-  - listar congregacoes por tenant
-  - listar usuarios do tenant
-  - ativar e inativar usuarios do tenant
+- `backend/src/modules/auth/auth.service.js`
 
-### Limitacao residual do estado atual
-`POST /api/auth/register` continua como fluxo legado/self-service.
+O metodo `register()` concentrava a criacao da igreja, seeds do tenant, criacao do admin inicial e, logo depois, o passo de autenticacao com tokens.
 
-Ele nao deve ser tratado como fluxo principal para a operacao da plataforma.
+Esse desenho tinha duas limitacoes principais:
+- dificultava o reaproveitamento no backoffice
+- misturava nascimento do tenant com inicio de sessao
 
-## Decisao arquitetural adotada
-O fluxo principal recomendado e:
+## Estado atual no codigo
 
-1. o backoffice cria o tenant
-2. o backoffice cria o admin inicial do tenant na mesma operacao
-3. a igreja usa esse primeiro admin para entrar no painel
-4. depois disso, a propria igreja cria os demais usuarios internos
+### Servico compartilhado
+O onboarding transacional do tenant agora fica centralizado em:
 
-Observacao:
-- `POST /api/auth/register` continua como fluxo legado
-- o fluxo principal passou a ser `POST /api/backoffice/tenants`
+- `backend/src/modules/tenants/tenant-onboarding.service.js`
+
+Esse servico hoje:
+- cria a igreja em `churches`
+- cria cargos ministeriais padrao em `roles`
+- cria perfis tecnicos padrao em `permission_profiles`
+- cria categorias financeiras padrao
+- resolve o perfil tecnico `Administrador Geral`
+- cria o admin inicial do tenant em `users`
+
+Tambem existe um metodo reutilizavel adicional:
+- `provisionInitialAdminForExistingTenant(...)`
+
+Status desse metodo:
+- implementado no servico
+- ainda nao exposto por endpoint proprio no backoffice atual
+
+### Quem usa o servico hoje
+
+#### `POST /api/auth/register`
+Usa `tenantOnboardingService.onboardTenant(...)` e continua existindo por compatibilidade.
+
+Depois do onboarding, `auth.service.js` continua responsavel por:
+- gerar tokens
+- salvar refresh token
+- atualizar `last_login`
+- formatar a resposta do endpoint
+
+#### `POST /api/backoffice/tenants`
+Usa `tenantOnboardingService.onboardTenant(...)` como fluxo oficial de onboarding da plataforma.
+
+Depois do onboarding, o backoffice continua responsavel por:
+- registrar auditoria de plataforma
+- devolver resumo do tenant criado
+- devolver resumo do admin inicial
 
 ## Matriz de criacao de usuarios
 
 | Tipo | Quem cria | Onde nasce | Tabela principal | Status |
 | --- | --- | --- | --- | --- |
-| Usuario de plataforma | Seed, bootstrap ou outro super admin da plataforma | Backoffice / operacao da plataforma | `platform_users` | Implementado |
+| Usuario de plataforma | Backoffice ou bootstrap da plataforma | Backoffice | `platform_users` | Implementado |
 | Admin inicial do tenant | Backoffice no onboarding da igreja | Onboarding do tenant | `users` | Implementado |
-| Usuarios adicionais do tenant | Admin da igreja | Painel da igreja | `users` | Proposto |
+| Admin inicial via fluxo legado | `/api/auth/register` por compatibilidade | Registro legado | `users` | Parcialmente implementado |
+| Usuarios adicionais do tenant | Admin da igreja | Painel do tenant | `users` | Proposto |
 | Membro | Operacao da igreja | Modulo de membros | `members` | Modelado |
 | Cargo ministerial | Operacao da igreja | Dominio eclesiastico | `roles` | Implementado |
 | Vinculo usuario-membro | Acao explicita da igreja | Gestao de usuarios | `users.member_id` | Parcialmente implementado |
@@ -116,96 +135,58 @@ Observacao:
 ## Fluxos funcionais
 
 ### Fluxo A - Criacao de usuario de plataforma
-Fluxo recomendado:
-
-1. em desenvolvimento, nasce por seed/bootstrap
-2. em producao, o primeiro nasce por bootstrap controlado
-3. novos usuarios de plataforma sao criados por um super admin da plataforma
-
 Estado atual:
-- seed de `platform_roles`: implementado
-- seed opcional de `platform_users`: implementado
-- login de plataforma: implementado
-- criacao manual via endpoint e tela: implementado
+- implementado via backoffice
+- isolado em `platform_users`
+- usa `platform_roles`
 
 ### Fluxo B - Criacao de nova igreja cliente
-Fluxo recomendado:
+Fluxo recomendado atual:
 
-1. operador da plataforma cria a igreja sede no backoffice
-2. o sistema cria o tenant em `churches`
-3. o sistema cria a base inicial do tenant:
-   - `roles`
-   - `permission_profiles`
-   - categorias financeiras padrao
-4. o sistema prepara a conta do admin inicial
-
-Estado atual:
-- implementado no backoffice em `POST /api/backoffice/tenants`
-- mantido tambem em `/api/auth/register` como reaproveitamento legado
-
-### Fluxo C - Criacao do admin inicial do tenant
-Fluxo recomendado:
-
-1. no onboarding, o backoffice recebe:
-   - dados da igreja sede
-   - nome do administrador inicial
-   - e-mail
-   - senha inicial
-2. o sistema cria `users` com:
-   - `church_id` da nova igreja
-   - `congregation_id = null`
-   - `permission_profile_id` do perfil `Administrador Geral`
-   - `member_id = null`
-3. o admin inicial entra no painel do tenant e passa a administrar a igreja
+1. operador da plataforma acessa o backoffice
+2. informa dados da igreja cliente
+3. informa dados do admin inicial
+4. o sistema executa `tenantOnboardingService.onboardTenant(...)`
+5. o sistema registra auditoria
+6. a igreja passa a existir em `churches`
+7. o admin inicial passa a existir em `users`
 
 Estado atual:
-- implementado dentro da transacao de onboarding compartilhada
-- acessivel pelo backoffice em `POST /api/backoffice/tenants`
+- implementado em `POST /api/backoffice/tenants`
+
+### Fluxo C - Registro legado de nova igreja
+Fluxo mantido por compatibilidade:
+
+1. cliente chama `POST /api/auth/register`
+2. o backend reaproveita `tenantOnboardingService.onboardTenant(...)`
+3. depois disso, `auth.service.js` gera os tokens e inicia a sessao
+
+Estado atual:
+- implementado
+- mantido como compatibilidade temporaria
+- nao e o fluxo principal recomendado da plataforma
 
 ### Fluxo D - Criacao de usuarios adicionais dentro da igreja
 Fluxo recomendado:
 
-1. admin da igreja acessa o painel do tenant
-2. cria um novo usuario tecnico
-3. informa:
-   - nome
-   - email
-   - senha inicial
-   - perfil tecnico
-   - escopo sede ou congregacao
-   - vinculo opcional com membro
-4. o sistema grava o usuario em `users`
+1. a igreja entra no painel do tenant
+2. cria usuarios tecnicos adicionais
+3. define perfil tecnico, escopo e eventual vinculo com membro
 
 Estado atual:
 - proposto
 
 ### Fluxo E - Vinculo opcional entre usuario e membro
-Fluxo recomendado:
-
-1. o membro e criado no modulo de membros
-2. depois, se fizer sentido, um usuario tecnico pode ser vinculado a esse membro
-3. o sistema grava `member_id` no usuario
-
-Regras:
-- o vinculo e opcional
-- nao e automatico
-- nao transforma todo membro em usuario
-
 Estado atual:
-- a coluna `users.member_id` existe
-- o `getMe` ja considera o membro vinculado
-- fluxo de criacao ou edicao desse vinculo ainda nao existe
+- `users.member_id` existe
+- `GET /api/auth/me` ja considera o membro vinculado
+- fluxo explicito de criar/editar esse vinculo ainda nao existe
 
 ### Fluxo F - Tratamento de cargos ministeriais
-Fluxo recomendado:
-
-1. o cargo ministerial permanece em `roles`
-2. a pessoa permanece em `members`
-3. o acesso tecnico permanece em `users`
-4. o perfil tecnico permanece em `permission_profiles`
-
-Regra central:
-- cargo ministerial nunca define sozinho permissao tecnica
+Estado atual:
+- `roles` continua no dominio ministerial
+- `permission_profiles` continua no dominio tecnico
+- nao ha reaproveitamento de cargo ministerial como permissao tecnica
 
 ## Regras de negocio consolidadas
 - `platform_users` representa operador da plataforma
@@ -215,65 +196,34 @@ Regra central:
 - `permission_profiles` define acesso ao painel do tenant
 - `roles` define cargo ministerial
 - o cadastro em `members` nao cria conta em `users`
-- o admin inicial do tenant pode nascer com `member_id = null`
-
-## Fluxo tecnico recomendado
-
-### Servico de onboarding
-O projeto agora centraliza o onboarding em um servico reutilizavel:
-
-- `backend/src/modules/tenants/tenant-onboarding.service.js`
-
-Esse servico e responsavel por:
-- criar igreja
-- criar cargos ministeriais padrao
-- criar perfis tecnicos padrao
-- criar categorias financeiras padrao
-- criar admin inicial do tenant
-
-### Endpoints atuais
-
-#### Backoffice
-- `POST /api/backoffice/tenants`
-  - cria tenant + admin inicial
-
-#### Tenant legado
-- `POST /api/auth/register`
-  - reaproveita a mesma logica, mas nao e o fluxo principal recomendado
+- o admin inicial do tenant nasce com `member_id = null`
+- o admin inicial do tenant nasce com `congregation_id = null`
 
 ## Status por tema
 
 ### Implementado
-- separacao estrutural entre `platform_users` e `users`
-- separacao estrutural entre `users` e `members`
-- separacao estrutural entre `roles` e `permission_profiles`
-- login de plataforma
-- login de tenant
-- onboarding tecnico de tenant em servico reutilizavel
-- onboarding principal do tenant em `/api/backoffice/tenants`
-- seed de plataforma
+- separacao estrutural entre plataforma e tenant
+- separacao estrutural entre usuario tecnico, membro e cargo ministerial
+- servico compartilhado de onboarding do tenant
+- fluxo oficial de onboarding via backoffice
+- fluxo legado de `/api/auth/register` reaproveitando o mesmo servico
+- login do tenant com usuarios criados pelo onboarding
 
 ### Parcialmente implementado
-- vinculo opcional entre usuario e membro na modelagem
-- `POST /api/auth/register` ainda existe como fluxo legado
+- `/api/auth/register` permanece como compatibilidade temporaria
+- metodo `provisionInitialAdminForExistingTenant(...)` existe no servico, mas ainda nao tem fluxo publico proprio no backoffice
+- vinculo opcional entre usuario e membro existe na modelagem, mas nao no fluxo completo de gestao
 
 ### Proposto
 - criacao de usuarios adicionais pelo tenant
 - reset de acesso com auditoria
-
-## Ordem recomendada de implementacao
-1. manter seed/bootstrap da plataforma
-2. manter o onboarding de tenant centralizado em servico reutilizavel
-3. manter `/api/auth/register` como legado temporario ou self-service opcional
-4. implementar gestao de usuarios do tenant no painel da igreja
-5. implementar vinculo opcional entre usuario e membro
+- fluxo publico controlado para provisionar admin inicial em tenant preexistente, se fizer sentido operacional
 
 ## Conclusao
-A melhor abordagem para o projeto atual permanece:
+O estado atual consolidado do projeto e:
 
-- plataforma/backoffice cria tenant e admin inicial
-- tenant cria os demais usuarios internos
-- membro continua separado de usuario
-- cargo ministerial continua separado de permissao tecnica
-
-Essa direcao reaproveita a modelagem ja existente, evita reescrita agressiva e prepara o projeto para uma evolucao incremental coerente com o backoffice ja implementado.
+- o onboarding do tenant foi extraido para um servico reutilizavel
+- o backoffice passou a ser o fluxo oficial para criar igreja cliente + admin inicial
+- `/api/auth/register` continua funcionando, mas como compatibilidade
+- o login do tenant continua baseado no contrato de `users`
+- a gestao rotineira de usuarios internos continua fora do backoffice

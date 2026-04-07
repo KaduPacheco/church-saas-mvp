@@ -59,10 +59,10 @@ watch(
     <div class="page-header">
       <div>
         <span class="eyebrow">Usuarios</span>
-        <h2>Usuarios da plataforma e onboarding</h2>
+        <h2>Usuarios da plataforma e onboarding de tenant</h2>
         <p>
           Gerencie usuarios da plataforma e execute o onboarding controlado de novas igrejas
-          clientes sem misturar isso com a gestao cotidiana do tenant.
+          clientes, sem transformar o backoffice em um CRUD comum de usuarios do tenant.
         </p>
       </div>
     </div>
@@ -71,7 +71,7 @@ watch(
       <h3>Separacao de responsabilidades</h3>
       <ul>
         <li>Usuarios da plataforma acessam o backoffice e operam o SaaS.</li>
-        <li>Novas igrejas nascem por onboarding: igreja sede primeiro, admin inicial junto.</li>
+        <li>Novas igrejas clientes nascem por onboarding: igreja sede primeiro, admin inicial junto.</li>
         <li>Usuarios da igreja acessam apenas o painel do tenant.</li>
         <li>Membros e cargos ministeriais nao definem acesso tecnico automaticamente.</li>
         <li>
@@ -102,7 +102,7 @@ watch(
           type="button"
           @click="setActiveTab('tenant-onboarding')"
         >
-          Onboarding do tenant
+          Nova igreja cliente
         </button>
       </div>
 
