@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store'
 import { useBackofficeAuthStore } from '@/stores/backoffice-auth.store'
+import { tenantNavigationItems } from '@/utils/tenant-navigation'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -93,7 +94,61 @@ const router = createRouter({
         {
           path: '',
           name: 'dashboard',
-          component: () => import('@/views/dashboard/DashboardView.vue')
+          component: () => import('@/views/dashboard/DashboardView.vue'),
+          meta: {
+            title: 'Painel da igreja sede',
+            permission: 'dashboard:read'
+          }
+        },
+        {
+          path: 'members',
+          name: 'tenant-members',
+          component: () => import('@/views/dashboard/TenantModuleView.vue'),
+          meta: {
+            title: 'Membros',
+            permission: 'members:read',
+            moduleKey: 'members'
+          }
+        },
+        {
+          path: 'congregations',
+          name: 'tenant-congregations',
+          component: () => import('@/views/dashboard/TenantModuleView.vue'),
+          meta: {
+            title: 'Congregacoes',
+            permission: 'churches:read',
+            moduleKey: 'congregations'
+          }
+        },
+        {
+          path: 'roles',
+          name: 'tenant-roles',
+          component: () => import('@/views/dashboard/TenantModuleView.vue'),
+          meta: {
+            title: 'Cargos ministeriais',
+            permission: 'roles:read',
+            moduleKey: 'roles'
+          }
+        },
+        {
+          path: 'profiles',
+          name: 'tenant-profiles',
+          component: () => import('@/views/dashboard/TenantModuleView.vue'),
+          meta: {
+            title: 'Perfis tecnicos',
+            permission: 'profiles:read',
+            moduleKey: 'profiles'
+          }
+        },
+        {
+          path: 'financial',
+          name: 'tenant-financial',
+          component: () => import('@/views/dashboard/TenantModuleView.vue'),
+          meta: {
+            title: 'Financeiro',
+            permission: 'financial:read',
+            moduleKey: 'financial'
+          }
         }
       ]
     }
@@ -157,7 +212,11 @@ router.beforeEach(async (to, from, next) => {
   }
 
   if (to.meta.permission && !authStore.hasPermission(to.meta.permission)) {
-    return next({ name: 'dashboard' })
+    const firstAllowedTenantRoute = tenantNavigationItems.find((item) =>
+      authStore.hasPermission(item.permission)
+    )
+
+    return next({ name: firstAllowedTenantRoute?.name || 'login' })
   }
 
   next()
