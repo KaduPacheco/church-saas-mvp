@@ -52,6 +52,7 @@ Store:
 Responsabilidades:
 - carregar tokens do `localStorage`
 - executar login
+- executar refresh automatico quando o access token expira
 - buscar usuario autenticado via `/auth/me`
 - verificar permissoes
 - limpar sessao no logout
@@ -83,9 +84,13 @@ Arquivo:
 - `frontend/src/services/backoffice-api.js`
 
 Comportamento:
-- `baseURL` fixa em `http://localhost:4000/api/backoffice`
+- usa `VITE_BACKOFFICE_API_BASE_URL` quando definida
+- em desenvolvimento local, faz fallback para `http://<hostname-atual>:4000/api/backoffice`
+- fora de `dev`, sem variavel definida, usa `/api/backoffice` no host atual em vez de depender de `localhost`
 - inclui `Authorization` quando existe token
-- em `401`, limpa sessao do backoffice e redireciona para login
+- em `401`, tenta `POST /api/backoffice/auth/refresh`
+- serializa requests concorrentes durante o refresh
+- limpa a sessao e redireciona para login apenas quando o refresh falha
 
 ## Fluxo de login
 1. usuario acessa `/backoffice/login`
@@ -94,14 +99,39 @@ Comportamento:
 4. store salva `user`
 5. frontend navega para `/backoffice`
 
+## Fluxo de refresh automatico
+1. uma request protegida recebe `401`
+2. o interceptor tenta `POST /api/backoffice/auth/refresh`
+3. se o refresh for valido, a store atualiza `accessToken`, `refreshToken` e `user`
+4. a request original e reenviada
+5. requests paralelas aguardam a mesma operacao de refresh
+
 ## Fluxo de logout
 1. usuario clica em `Sair`
-2. store remove as chaves do backoffice
-3. sessao em memoria e limpa
-4. frontend navega para `/backoffice/login`
+2. se houver `accessToken`, a store tenta `POST /api/backoffice/auth/logout`
+3. store remove as chaves do backoffice
+4. sessao em memoria e limpa
+5. frontend navega para `/backoffice/login`
 
 ## Limitacoes atuais
-- o cliente HTTP do backoffice nao usa variavel de ambiente para `baseURL`
-- o refresh token existe na store, mas ainda nao ha fluxo automatico de renovacao
 - ainda nao ha telas separadas para congregacoes e usuarios; a visualizacao acontece dentro do detalhe do tenant
 - a aba `Usuarios` do backoffice nao faz a gestao rotineira dos usuarios internos da igreja; ela trata apenas usuarios da plataforma e o provisionamento do admin inicial do tenant
+- o frontend ainda nao possui testes automatizados para router, guards ou interceptor de refresh do backoffice
+
+## Variaveis de ambiente do frontend
+Arquivo de exemplo:
+- `frontend/.env.example`
+
+Variaveis:
+- `VITE_API_BASE_URL`
+- `VITE_BACKOFFICE_API_BASE_URL`
+
+Exemplo local:
+
+```env
+VITE_API_BASE_URL=http://localhost:4000/api
+VITE_BACKOFFICE_API_BASE_URL=http://localhost:4000/api/backoffice
+```
+
+Observacao:
+- o fallback automatico de `dev` usa o hostname atual na porta `4000`, o que em ambiente local padrao resulta nos mesmos enderecos acima

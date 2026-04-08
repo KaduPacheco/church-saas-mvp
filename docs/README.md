@@ -1,6 +1,16 @@
 # Documentacao - Projeto SaaS Gestao de Igrejas
 
-Esta pasta concentra a documentacao funcional do projeto e foi ajustada para refletir o codigo real atual.
+Esta pasta concentra a documentacao funcional do projeto e deve refletir o codigo real atual.
+
+Pontos de entrada mais uteis para onboarding no estado atual:
+
+- [06 - Autenticacao](./06-autenticacao.md)
+- [15 - Backoffice - Frontend](./15-backoffice-frontend.md)
+- [21 - Backoffice - Execucao Local](./21-backoffice-execucao-local.md)
+
+Observacao:
+- quando houver divergencia entre descricao e implementacao, considere o codigo do repositorio como fonte da verdade
+- documentos de roadmap e limitacoes descrevem apenas lacunas reais identificadas no estado atual do codigo
 
 ## Indice
 

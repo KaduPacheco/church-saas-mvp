@@ -26,25 +26,21 @@ No estado atual, o backoffice ja cumpre o objetivo de supervisao administrativa 
 - separacao real entre plataforma e tenant
 
 ## Limitacoes conhecidas
-- sem refresh token automatico do backoffice no frontend
 - sem gestao visual de papeis e permissoes de plataforma
 - sem reset de acesso de usuario tenant
 - sem exportacao de auditoria
-- sem testes automatizados especificos do backoffice
+- sem testes automatizados HTTP/integrados dos endpoints do backoffice
+- sem testes automatizados do frontend para router, guards e interceptor
 - sem filtros avancados para usuarios administrativos
-- sem criacao completa de tenant pelo backoffice
 
 ## Proximos passos recomendados
-1. implementar refresh token completo do backoffice no frontend
-2. adicionar testes automatizados de API para os endpoints do backoffice
-3. adicionar testes do router e guards do frontend
-4. melhorar filtros e consulta de auditoria
-5. adicionar filtros mais ricos para usuarios administrativos
-6. extrair a logica de onboarding do tenant de `/api/auth/register` para um servico reutilizavel
-7. implementar a criacao completa de tenant + admin inicial pelo backoffice
-8. implementar a criacao de usuarios internos pelo painel do tenant
-9. evoluir a documentacao operacional do deploy do backoffice
-10. avaliar uso de variavel de ambiente para a `baseURL` do frontend
+1. adicionar testes automatizados de API para os endpoints do backoffice
+2. adicionar testes do router, guards e interceptor do frontend
+3. melhorar filtros e consulta de auditoria
+4. adicionar filtros mais ricos para usuarios administrativos
+5. extrair a logica de onboarding do tenant de `/api/auth/register` para um servico reutilizavel
+6. implementar a criacao de usuarios internos pelo painel do tenant
+7. evoluir a documentacao operacional do deploy do backoffice
 
 ## Fora do escopo do MVP atual
 - observabilidade avancada

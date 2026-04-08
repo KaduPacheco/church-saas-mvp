@@ -39,6 +39,8 @@ Middlewares:
 
 Endpoints:
 - `POST /api/backoffice/auth/login`
+- `POST /api/backoffice/auth/refresh`
+- `POST /api/backoffice/auth/logout`
 - `GET /api/backoffice/auth/me`
 
 Claims relevantes:
@@ -79,18 +81,31 @@ Backoffice:
 - auditoria persistida para acoes criticas do backoffice
 
 ## Observacao de Execucao Local
-O frontend usa `http://localhost:4000` como API e o backend aceita `CORS_ORIGIN` configuravel.
+O backend aceita `CORS_ORIGIN` configuravel e o frontend passa a ler as URLs de API via variaveis `VITE_*`.
 
 Para uso local padronizado:
 - frontend principal: `http://localhost:3000`
 - backoffice: `http://localhost:3000/backoffice/login`
+- `VITE_API_BASE_URL=http://localhost:4000/api`
+- `VITE_BACKOFFICE_API_BASE_URL=http://localhost:4000/api/backoffice`
 - `CORS_ORIGIN=http://localhost:3000`
+
+Detalhe importante:
+- `PLATFORM_JWT_*` pode ser configurado separadamente para o backoffice
+- se `PLATFORM_JWT_SECRET` e `PLATFORM_JWT_REFRESH_SECRET` nao forem definidos, o backend reutiliza `JWT_SECRET` e `JWT_REFRESH_SECRET`
+- em desenvolvimento, se as variaveis `VITE_*` nao existirem, o frontend faz fallback para `http://<hostname-atual>:4000/...`
+- fora de `dev`, o frontend usa a variavel configurada ou caminho relativo no host atual, sem depender de `localhost`
 
 ## Documentacao relacionada
 - [13 - Backoffice - Autenticacao e Autorizacao](./13-backoffice-autenticacao-e-autorizacao.md)
 - [15 - Backoffice - Frontend](./15-backoffice-frontend.md)
 - [21 - Backoffice - Execucao Local](./21-backoffice-execucao-local.md)
 
-## Limitacao atual do backoffice
-- o backend ja emite refresh token de plataforma e o persiste em `platform_users`
-- o frontend do backoffice ainda nao implementa um fluxo completo de refresh automatico
+## Refresh do backoffice
+- o backend emite refresh token de plataforma e o persiste em `platform_users`
+- o frontend do backoffice tenta refresh automatico ao receber `401`
+- se o refresh falhar, a sessao da plataforma e limpa sem afetar a sessao tenant
+
+## Limitacoes atuais
+- tenant e backoffice ainda usam tokens em `localStorage`; nao ha cookies `HttpOnly`
+- nao existe teste automatizado do frontend para o interceptor do backoffice

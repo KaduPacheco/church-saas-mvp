@@ -8,10 +8,12 @@ O backoffice e a camada administrativa global da plataforma. Ele convive com a a
 
 ## O que o codigo atual ja entrega
 - autenticacao de plataforma
+- refresh automatico de sessao no frontend do backoffice
 - dashboard global basico
 - gestao de tenants
 - supervisao de congregacoes por tenant
 - supervisao de usuarios administrativos do tenant
+- gestao de usuarios da plataforma
 - auditoria persistida basica
 
 ## Estruturas de banco do backoffice
@@ -27,6 +29,9 @@ O backoffice e a camada administrativa global da plataforma. Ele convive com a a
 - `platform:congregations:read`
 - `platform:users:read`
 - `platform:users:write`
+- `platform:platform-users:read`
+- `platform:platform-users:write`
+- `platform:tenant-initial-admin:write`
 - `platform:audit:read`
 
 ## Acesso local de desenvolvimento
@@ -38,6 +43,7 @@ O backoffice e a camada administrativa global da plataforma. Ele convive com a a
 
 Observacao:
 - essas credenciais dependem das variaveis `BACKOFFICE_SUPER_ADMIN_*` configuradas como no `.env.example`
+- o frontend tambem pode usar `frontend/.env` com `VITE_API_BASE_URL` e `VITE_BACKOFFICE_API_BASE_URL`
 - troque a senha depois do primeiro acesso local
 
 ## Documentacao detalhada

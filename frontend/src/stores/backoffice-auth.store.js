@@ -51,6 +51,22 @@ export const useBackofficeAuthStore = defineStore('backoffice-auth', () => {
     }
   }
 
+  async function refreshToken() {
+    if (!refreshTokenVal.value) {
+      throw new Error('Sem refresh token do backoffice')
+    }
+
+    try {
+      const response = await backofficeAuthService.refresh(refreshTokenVal.value)
+      setTokens(response.data.accessToken, response.data.refreshToken)
+      user.value = response.data.user
+      return response.data.accessToken
+    } catch (error) {
+      clearTokens()
+      throw error
+    }
+  }
+
   async function fetchUser() {
     if (!accessToken.value) return false
 
@@ -63,7 +79,15 @@ export const useBackofficeAuthStore = defineStore('backoffice-auth', () => {
     }
   }
 
-  function logout(forced = false) {
+  async function logout(forced = false) {
+    if (!forced && accessToken.value) {
+      try {
+        await backofficeAuthService.logout()
+      } catch (_error) {
+        // ignora erros no logout
+      }
+    }
+
     clearTokens()
 
     const currentRouteName = router.currentRoute.value.name
@@ -81,6 +105,7 @@ export const useBackofficeAuthStore = defineStore('backoffice-auth', () => {
     userPermissions,
     isPlatformSuperAdmin,
     login,
+    refreshToken,
     fetchUser,
     logout,
     hasPermission

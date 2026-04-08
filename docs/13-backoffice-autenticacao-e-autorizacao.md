@@ -15,6 +15,8 @@ O papel de plataforma fica em `platform_users.role_id`, apontando para `platform
 Endpoints atuais:
 
 - `POST /api/backoffice/auth/login`
+- `POST /api/backoffice/auth/refresh`
+- `POST /api/backoffice/auth/logout`
 - `GET /api/backoffice/auth/me`
 
 ### Login
@@ -25,6 +27,25 @@ O backend:
 - gera `accessToken` e `refreshToken`
 - persiste `refresh_token`, expiracao e `last_login`
 - registra auditoria de login
+
+### Refresh
+O backend:
+- valida o `refreshToken` com `env.platformJwt.refreshSecret`
+- exige `scope: 'platform'`
+- busca o usuario em `platform_users` e confirma papel ativo
+- compara o token recebido com o `refresh_token` salvo no banco
+- rota o par `accessToken` + `refreshToken`
+- persiste o novo `refresh_token`
+- se detectar mismatch entre token recebido e token salvo, limpa o token persistido e exige novo login
+
+### Logout
+O backend:
+- exige `Authorization: Bearer <platform_access_token>`
+- limpa `refresh_token` e `refresh_token_expires` do usuario da plataforma
+
+No frontend:
+- logout iniciado pelo usuario chama `POST /api/backoffice/auth/logout` quando ainda existe `accessToken`
+- logout forcado apos falha de refresh limpa apenas a sessao local e redireciona para `/backoffice/login`
 
 ### Claims do token de plataforma
 - `scope: 'platform'`
@@ -92,6 +113,28 @@ Content-Type: application/json
 }
 ```
 
+## Exemplo de request de refresh
+```http
+POST /api/backoffice/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "<jwt>"
+}
+```
+
+## Exemplo de request de logout
+```http
+POST /api/backoffice/auth/logout
+Authorization: Bearer <platform_access_token>
+```
+
+## Exemplo de request de me
+```http
+GET /api/backoffice/auth/me
+Authorization: Bearer <platform_access_token>
+```
+
 ## Exemplo de resposta esperada
 ```json
 {
@@ -114,5 +157,5 @@ Content-Type: application/json
 ```
 
 ## Limitacoes atuais
-- o backend emite refresh token de plataforma, mas o frontend ainda nao faz refresh automatico
 - ainda nao existe interface para editar papeis ou permissoes de plataforma
+- a sessao continua baseada em tokens salvos no navegador; nao ha cookies `HttpOnly`

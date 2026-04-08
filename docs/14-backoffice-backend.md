@@ -31,6 +31,8 @@ O padrao segue a estrutura usada no restante do backend:
 
 ### Autenticacao
 - `POST /api/backoffice/auth/login`
+- `POST /api/backoffice/auth/refresh`
+- `POST /api/backoffice/auth/logout`
 - `GET /api/backoffice/auth/me`
 
 ### Dashboard
@@ -59,6 +61,8 @@ O padrao segue a estrutura usada no restante do backend:
 
 ### Auth
 - login de plataforma
+- refresh token de plataforma com rotacao
+- logout de plataforma invalidando refresh token salvo
 - retorno do usuario autenticado
 - auditoria de login
 
@@ -90,6 +94,7 @@ O backoffice usa `express-validator` e middleware `validate`.
 
 Validacoes presentes no codigo:
 - payload de login
+- payload de refresh token
 - filtros de listagem de tenants
 - validacao de UUID para tenant e usuario
 - validacao de status de tenant
@@ -151,7 +156,6 @@ Content-Type: application/json
 - mudancas criticas registram auditoria
 
 ## Limitacoes atuais
-- nao ha refresh token de backoffice exposto por endpoint dedicado no codigo atual
 - nao ha modulo de edicao de papeis/permissoes de plataforma
 - nao ha exportacao de auditoria
 - `POST /api/auth/register` continua existindo como fluxo legado reaproveitando a mesma logica de onboarding
