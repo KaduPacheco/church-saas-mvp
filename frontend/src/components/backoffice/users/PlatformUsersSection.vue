@@ -197,7 +197,8 @@ onMounted(async () => {
       <div>
         <h3>Usuarios da plataforma</h3>
         <p>
-          Gerencie apenas as contas que acessam o backoffice e operam a plataforma SaaS.
+          Gerencie apenas as contas que acessam o backoffice e operam a plataforma SaaS,
+          sem misturar este fluxo com usuarios internos das igrejas clientes.
         </p>
       </div>
 
@@ -349,6 +350,7 @@ onMounted(async () => {
           <h3>{{ isEditMode ? 'Editar usuario da plataforma' : 'Criar usuario da plataforma' }}</h3>
           <p>
             Use este formulario apenas para contas que acessam o backoffice da plataforma.
+            O primeiro usuario tecnico do tenant nasce na aba de onboarding da igreja cliente.
           </p>
         </div>
       </div>

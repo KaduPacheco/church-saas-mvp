@@ -19,6 +19,16 @@ Registrar os fluxos funcionais principais do backoffice no estado atual do codig
 4. se existir e `user` nao estiver carregado, a store chama `GET /api/backoffice/auth/me`
 5. se a permissao exigida nao existir, o usuario volta para a home do backoffice
 
+## Fluxo 2B - Refresh automatico do backoffice
+1. uma request protegida recebe `401`
+2. o cliente HTTP ignora retry para `/auth/login` e `/auth/refresh`
+3. o frontend envia `POST /api/backoffice/auth/refresh`
+4. o backend valida o refresh token salvo em `platform_users`
+5. o backend rota `accessToken` e `refreshToken`
+6. o frontend atualiza a store
+7. a request original e reenviada
+8. se o refresh falhar, a sessao e limpa e o usuario volta para `/backoffice/login`
+
 ## Fluxo 3 - Listagem de tenants
 1. usuario abre `/backoffice/tenants`
 2. frontend chama `GET /api/backoffice/tenants`

@@ -1,10 +1,12 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { computed, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useBackofficeAuthStore } from '@/stores/backoffice-auth.store'
 import PlatformUsersSection from '@/components/backoffice/users/PlatformUsersSection.vue'
-import TenantInitialAdminSection from '@/components/backoffice/users/TenantInitialAdminSection.vue'
+import TenantOnboardingSection from '@/components/backoffice/users/TenantOnboardingSection.vue'
 
+const route = useRoute()
+const router = useRouter()
 const backofficeAuthStore = useBackofficeAuthStore()
 
 const canManagePlatformUsers = computed(() =>
@@ -12,11 +14,44 @@ const canManagePlatformUsers = computed(() =>
   backofficeAuthStore.hasPermission('platform:platform-users:write')
 )
 
-const canProvisionTenantInitialAdmin = computed(() =>
+const canRunTenantOnboarding = computed(() =>
   backofficeAuthStore.hasPermission('platform:tenant-initial-admin:write')
 )
 
-const activeTab = ref(canManagePlatformUsers.value ? 'platform' : 'tenant-initial-admin')
+function normalizeTab(value) {
+  if (value === 'tenant-onboarding' && canRunTenantOnboarding.value) {
+    return 'tenant-onboarding'
+  }
+
+  if (value === 'platform' && canManagePlatformUsers.value) {
+    return 'platform'
+  }
+
+  if (canRunTenantOnboarding.value) {
+    return 'tenant-onboarding'
+  }
+
+  return 'platform'
+}
+
+const activeTab = ref(normalizeTab(route.query.tab))
+
+function setActiveTab(tab) {
+  activeTab.value = normalizeTab(tab)
+  router.replace({
+    query: {
+      ...route.query,
+      tab: activeTab.value,
+    },
+  })
+}
+
+watch(
+  () => route.query.tab,
+  (tab) => {
+    activeTab.value = normalizeTab(tab)
+  }
+)
 </script>
 
 <template>
@@ -24,10 +59,10 @@ const activeTab = ref(canManagePlatformUsers.value ? 'platform' : 'tenant-initia
     <div class="page-header">
       <div>
         <span class="eyebrow">Usuarios</span>
-        <h2>Usuarios do backoffice</h2>
+        <h2>Usuarios da plataforma e onboarding de tenant</h2>
         <p>
-          Gerencie usuarios da plataforma e provisione, de forma controlada, o admin inicial de
-          uma igreja cliente.
+          Gerencie usuarios da plataforma e execute o onboarding controlado de novas igrejas
+          clientes, sem transformar o backoffice em um CRUD comum de usuarios do tenant.
         </p>
       </div>
     </div>
@@ -36,6 +71,7 @@ const activeTab = ref(canManagePlatformUsers.value ? 'platform' : 'tenant-initia
       <h3>Separacao de responsabilidades</h3>
       <ul>
         <li>Usuarios da plataforma acessam o backoffice e operam o SaaS.</li>
+        <li>Novas igrejas clientes nascem por onboarding: igreja sede primeiro, admin inicial junto.</li>
         <li>Usuarios da igreja acessam apenas o painel do tenant.</li>
         <li>Membros e cargos ministeriais nao definem acesso tecnico automaticamente.</li>
         <li>
@@ -54,26 +90,26 @@ const activeTab = ref(canManagePlatformUsers.value ? 'platform' : 'tenant-initia
           class="tab-button"
           :class="{ active: activeTab === 'platform' }"
           type="button"
-          @click="activeTab = 'platform'"
+          @click="setActiveTab('platform')"
         >
           Usuarios da plataforma
         </button>
 
         <button
-          v-if="canProvisionTenantInitialAdmin"
+          v-if="canRunTenantOnboarding"
           class="tab-button"
-          :class="{ active: activeTab === 'tenant-initial-admin' }"
+          :class="{ active: activeTab === 'tenant-onboarding' }"
           type="button"
-          @click="activeTab = 'tenant-initial-admin'"
+          @click="setActiveTab('tenant-onboarding')"
         >
-          Admin inicial do tenant
+          Nova igreja cliente
         </button>
       </div>
 
       <div class="tab-content">
         <PlatformUsersSection v-if="activeTab === 'platform' && canManagePlatformUsers" />
-        <TenantInitialAdminSection
-          v-else-if="activeTab === 'tenant-initial-admin' && canProvisionTenantInitialAdmin"
+        <TenantOnboardingSection
+          v-else-if="activeTab === 'tenant-onboarding' && canRunTenantOnboarding"
         />
       </div>
     </div>

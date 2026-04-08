@@ -28,16 +28,4 @@ export const backofficeUsersService = {
   updatePlatformUserStatus(id, isActive) {
     return backofficeApi.patch(`/users/platform/${id}/status`, { isActive })
   },
-
-  listEligibleTenants(params = {}) {
-    return backofficeApi.get('/users/tenant-initial-admin/eligible-tenants', { params })
-  },
-
-  listTenantInitialAdminProfiles(tenantId) {
-    return backofficeApi.get(`/users/tenant-initial-admin/tenants/${tenantId}/profiles`)
-  },
-
-  provisionTenantInitialAdmin(payload) {
-    return backofficeApi.post('/users/tenant-initial-admin', payload)
-  }
 }

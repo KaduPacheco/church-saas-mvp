@@ -217,149 +217,6 @@ async function updatePlatformUserStatus({
   return getPlatformUserById(platformUserId);
 }
 
-async function listEligibleTenants({ search }) {
-  const tenants = await db('churches')
-    .modify((queryBuilder) => {
-      if (search) {
-        queryBuilder.where((searchQuery) => {
-          searchQuery
-            .whereILike('name', `%${search}%`)
-            .orWhereILike('email', `%${search}%`)
-            .orWhereILike('document', `%${search}%`);
-        });
-      }
-
-      queryBuilder.whereNotExists(
-        db('users')
-          .select(1)
-          .whereRaw('users.church_id = churches.id')
-      );
-    })
-    .select('id', 'name', 'email', 'status', 'created_at')
-    .orderBy('name', 'asc');
-
-  return tenants.map((tenant) => ({
-    id: tenant.id,
-    name: tenant.name,
-    email: tenant.email,
-    status: tenant.status,
-    createdAt: tenant.created_at,
-  }));
-}
-
-async function listTenantInitialAdminProfiles(tenantId) {
-  await ensureTenantExists(tenantId);
-
-  const profiles = await db('permission_profiles')
-    .select('id', 'name', 'description', 'permissions')
-    .where({
-      church_id: tenantId,
-      is_active: true,
-    })
-    .orderByRaw(`CASE WHEN name = 'Administrador Geral' THEN 0 ELSE 1 END`)
-    .orderBy('name', 'asc');
-
-  return profiles.map((profile) => ({
-    id: profile.id,
-    name: profile.name,
-    description: profile.description,
-    permissions: parsePermissions(profile.permissions),
-  }));
-}
-
-async function provisionTenantInitialAdmin({
-  tenantId,
-  name,
-  email,
-  password,
-  permissionProfileId,
-  actorPlatformUserId,
-  ipAddress = null,
-  userAgent = null,
-}) {
-  const tenant = await ensureTenantExists(tenantId);
-  const existingUsersCount = await db('users')
-    .where({ church_id: tenantId })
-    .count('* as total')
-    .first();
-
-  if (parseCount(existingUsersCount?.total) > 0) {
-    throw new BadRequestError('Esta igreja cliente ja possui usuarios e nao pode usar o fluxo de admin inicial');
-  }
-
-  const existingUser = await db('users').where({ email }).first();
-  if (existingUser) {
-    throw new ConflictError('Ja existe um usuario da igreja com este e-mail');
-  }
-
-  const profile = await db('permission_profiles')
-    .select('id', 'church_id', 'name', 'description', 'permissions', 'is_active')
-    .where({ id: permissionProfileId, church_id: tenantId })
-    .first();
-
-  if (!profile || !profile.is_active) {
-    throw new NotFoundError('Perfil tecnico inicial nao encontrado para esta igreja cliente');
-  }
-
-  const passwordHash = await bcrypt.hash(password, 10);
-
-  const [user] = await db('users')
-    .insert({
-      id: uuidv4(),
-      church_id: tenantId,
-      congregation_id: null,
-      permission_profile_id: profile.id,
-      member_id: null,
-      name,
-      email,
-      password_hash: passwordHash,
-      is_active: true,
-    })
-    .returning('*');
-
-  await auditService.register({
-    actorPlatformUserId,
-    churchId: tenant.id,
-    action: 'platform.tenant.initial_admin.provisioned',
-    targetType: 'tenant_user',
-    targetId: user.id,
-    targetLabel: user.email,
-    metadata: {
-      tenantId: tenant.id,
-      tenantName: tenant.name,
-      permissionProfileId: profile.id,
-      permissionProfileName: profile.name,
-    },
-    ipAddress,
-    userAgent,
-  });
-
-  return {
-    id: user.id,
-    tenant: {
-      id: tenant.id,
-      name: tenant.name,
-      status: tenant.status,
-    },
-    name: user.name,
-    email: user.email,
-    isActive: user.is_active,
-    profile: {
-      id: profile.id,
-      name: profile.name,
-      description: profile.description,
-      permissions: parsePermissions(profile.permissions),
-    },
-    scope: {
-      type: 'tenant',
-      congregationId: null,
-      congregationName: null,
-      label: 'Sede / tenant completo',
-    },
-    createdAt: user.created_at,
-  };
-}
-
 async function getPlatformUserById(platformUserId) {
   const row = await getPlatformUserRecordById(platformUserId);
   return formatPlatformUser(row);
@@ -403,19 +260,6 @@ async function getActivePlatformRole(roleId) {
   return role;
 }
 
-async function ensureTenantExists(tenantId) {
-  const tenant = await db('churches')
-    .select('id', 'name', 'status')
-    .where({ id: tenantId })
-    .first();
-
-  if (!tenant) {
-    throw new NotFoundError('Igreja cliente nao encontrada');
-  }
-
-  return tenant;
-}
-
 function formatPlatformUser(platformUser) {
   return {
     id: platformUser.id,
@@ -455,7 +299,4 @@ module.exports = {
   createPlatformUser,
   updatePlatformUser,
   updatePlatformUserStatus,
-  listEligibleTenants,
-  listTenantInitialAdminProfiles,
-  provisionTenantInitialAdmin,
 };

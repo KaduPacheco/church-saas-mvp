@@ -41,18 +41,20 @@ O projeto possui duas camadas de acesso coexistindo no mesmo repositorio:
 ## Escopo funcional entregue no codigo atual
 - login de plataforma
 - sessao isolada no frontend
+- refresh automatico do backoffice no frontend
 - dashboard global basico
 - gestao de tenants
 - supervisao de congregacoes por tenant
 - supervisao de usuarios administrativos do tenant
+- gestao de usuarios da plataforma
 - auditoria basica com consulta
 
 ## Limitacoes atuais do MVP
-- sem fluxo completo de refresh token do backoffice no frontend
 - sem reset de acesso de usuario tenant
 - sem exportacao de auditoria
 - sem modulo visual de gestao de permissoes de plataforma
-- sem testes automatizados do backoffice implementados no repositorio atual
+- sem testes automatizados de frontend para router, guards e interceptor do backoffice
+- sem testes HTTP/integrados dos endpoints do backoffice
 
 ## Documentos relacionados
 - [12 - Backoffice - Arquitetura](./12-backoffice-arquitetura.md)

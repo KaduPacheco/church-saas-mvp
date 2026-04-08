@@ -37,6 +37,7 @@ Rotas atuais do backoffice:
 - `/backoffice/tenants`
 - `/backoffice/tenants/:id`
 - `/backoffice/audit`
+- `/backoffice/users`
 
 Layout dedicado:
 - `BackofficeAuthLayout.vue`
@@ -75,6 +76,10 @@ Essa separacao evita colisao entre sessao da igreja e sessao da plataforma.
 5. consultas globais usam leitura agregada das tabelas existentes
 
 ## Limitacoes atuais
-- o frontend usa `baseURL` fixa para `http://localhost:4000/api/backoffice`
-- o refresh token de plataforma existe no backend, mas ainda nao tem fluxo completo no frontend
 - nao ha modulo grafico de administracao de papeis de plataforma
+
+## Configuracao de ambiente do frontend
+- `VITE_API_BASE_URL` configura a API do tenant
+- `VITE_BACKOFFICE_API_BASE_URL` configura a API do backoffice
+- em desenvolvimento local, o backoffice ainda tem fallback seguro para `http://<hostname-atual>:4000/api/backoffice`
+- fora de `dev`, sem variavel definida, o cliente usa `/api/backoffice` no host atual

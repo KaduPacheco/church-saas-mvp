@@ -1,15 +1,33 @@
 import axios from 'axios'
 import { useAuthStore } from '@/stores/auth.store'
 
-// Cria instância do axios configurada para o backend
+function buildLocalApiBaseUrl(pathname) {
+  return `http://${window.location.hostname}:4000${pathname}`
+}
+
+function resolveApiBaseUrl() {
+  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim()
+
+  if (configuredBaseUrl) {
+    return configuredBaseUrl
+  }
+
+  if (import.meta.env.DEV) {
+    return buildLocalApiBaseUrl('/api')
+  }
+
+  return '/api'
+}
+
+// Cria instÃ¢ncia do axios configurada para o backend
 export const api = axios.create({
-  baseURL: 'http://localhost:4000/api',
+  baseURL: resolveApiBaseUrl(),
   headers: {
     'Content-Type': 'application/json'
   }
 })
 
-// Request Interceptor: Injeta o token em todas as requisições
+// Request Interceptor: Injeta o token em todas as requisiÃ§Ãµes
 api.interceptors.request.use(
   (config) => {
     const authStore = useAuthStore()
@@ -21,7 +39,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
-// Variáveis para controle de fila de refresh token
+// VariÃ¡veis para controle de fila de refresh token
 let isRefreshing = false
 let failedQueue = []
 
@@ -36,15 +54,15 @@ const processQueue = (error, token = null) => {
   failedQueue = []
 }
 
-// Response Interceptor: Trata expiração do token (401)
+// Response Interceptor: Trata expiraÃ§Ã£o do token (401)
 api.interceptors.response.use(
   (response) => response.data,
   async (error) => {
     const originalRequest = error.config
 
-    // Verifica se o erro é 401 e a requisição ainda não foi reenviada
+    // Verifica se o erro Ã© 401 e a requisiÃ§Ã£o ainda nÃ£o foi reenviada
     if (error.response?.status === 401 && !originalRequest._retry) {
-      // Se a requisição que falhou era de login ou refresh, não tenta de novo
+      // Se a requisiÃ§Ã£o que falhou era de login ou refresh, nÃ£o tenta de novo
       if (originalRequest.url.includes('/auth/login') || originalRequest.url.includes('/auth/refresh')) {
         return Promise.reject(error)
       }
@@ -52,7 +70,7 @@ api.interceptors.response.use(
       const authStore = useAuthStore()
 
       if (isRefreshing) {
-        // Já existe um refresh acontecendo, enfileira essa request
+        // JÃ¡ existe um refresh acontecendo, enfileira essa request
         return new Promise(function(resolve, reject) {
           failedQueue.push({ resolve, reject })
         }).then(token => {
@@ -73,20 +91,20 @@ api.interceptors.response.use(
         // Retoma fila pendente
         processQueue(null, newAccessToken)
         
-        // Refaz a requisição original com novo token
+        // Refaz a requisiÃ§Ã£o original com novo token
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
         return axios(originalRequest).then(res => res.data)
       } catch (refreshError) {
-        // Refresh falhou, derruba a sessão
+        // Refresh falhou, derruba a sessÃ£o
         processQueue(refreshError, null)
-        authStore.logout(true) // força logout reativo
+        authStore.logout(true) // forÃ§a logout reativo
         return Promise.reject(refreshError)
       } finally {
         isRefreshing = false
       }
     }
 
-    // Tratamento de erros padrão padronizando no formato do AppError do backend
+    // Tratamento de erros padrÃ£o padronizando no formato do AppError do backend
     const apiError = error.response?.data?.error || {
       message: 'Ocorreu um erro inesperado',
       code: 'UNKNOWN_ERROR'

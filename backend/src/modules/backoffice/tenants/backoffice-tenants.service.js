@@ -1,6 +1,59 @@
 const db = require('../../../config/database');
+const tenantOnboardingService = require('../../tenants/tenant-onboarding.service');
 const { NotFoundError } = require('../../../utils/errors');
 const auditService = require('../audit/audit.service');
+
+async function createTenantOnboarding({
+  churchName,
+  churchEmail,
+  churchPhone,
+  churchDocument,
+  initialAdminName,
+  initialAdminEmail,
+  initialAdminPassword,
+  actorPlatformUserId,
+  ipAddress = null,
+  userAgent = null,
+}) {
+  const { church, initialAdmin, adminProfile } = await tenantOnboardingService.onboardTenant({
+    churchName,
+    churchEmail,
+    churchPhone,
+    churchDocument,
+    initialAdminName,
+    initialAdminEmail,
+    initialAdminPassword,
+  });
+
+  await auditService.register({
+    actorPlatformUserId,
+    churchId: church.id,
+    action: 'platform.tenant.onboarded',
+    targetType: 'tenant',
+    targetId: church.id,
+    targetLabel: church.name,
+    metadata: {
+      initialStatus: church.status,
+      initialPlan: church.plan,
+      initialAdminId: initialAdmin.id,
+      initialAdminEmail: initialAdmin.email,
+      initialAdminProfileId: adminProfile.id,
+      initialAdminProfileName: adminProfile.name,
+    },
+    ipAddress,
+    userAgent,
+  });
+
+  return {
+    tenant: formatTenantDetail({
+      ...church,
+      congregations_count: 0,
+      users_count: 1,
+      members_count: 0,
+    }),
+    initialAdmin: formatTenantUser(initialAdmin, adminProfile),
+  };
+}
 
 async function listTenants({ search, status, page = 1, perPage = 10 }) {
   const currentPage = Number.parseInt(page, 10) || 1;
@@ -205,26 +258,21 @@ async function listTenantUsers(tenantId) {
     .orderBy('u.name', 'asc');
 
   return users.map((user) => ({
-    id: user.id,
-    tenantId: user.church_id,
-    name: user.name,
-    email: user.email,
-    isActive: user.is_active,
+    ...formatTenantUser(
+      user,
+      {
+        id: user.profile_id,
+        name: user.profile_name,
+        permissions: user.profile_permissions,
+      },
+      user.congregation_id
+        ? {
+            id: user.congregation_id,
+            name: user.congregation_name,
+          }
+        : null
+    ),
     lastLogin: user.last_login,
-    createdAt: user.created_at,
-    profile: {
-      id: user.profile_id,
-      name: user.profile_name,
-      permissions: parsePermissions(user.profile_permissions),
-    },
-    scope: {
-      type: user.congregation_id ? 'congregation' : 'tenant',
-      congregationId: user.congregation_id,
-      congregationName: user.congregation_name || null,
-      label: user.congregation_id
-        ? `Congregacao: ${user.congregation_name}`
-        : 'Sede / tenant completo',
-    },
   }));
 }
 
@@ -332,6 +380,30 @@ function parsePermissions(permissions) {
   return [];
 }
 
+function formatTenantUser(user, profile, congregation = null) {
+  return {
+    id: user.id,
+    tenantId: user.church_id,
+    name: user.name,
+    email: user.email,
+    isActive: user.is_active,
+    createdAt: user.created_at,
+    profile: {
+      id: profile.id,
+      name: profile.name,
+      permissions: parsePermissions(profile.permissions),
+    },
+    scope: {
+      type: congregation ? 'congregation' : 'tenant',
+      congregationId: congregation?.id || null,
+      congregationName: congregation?.name || null,
+      label: congregation
+        ? `Congregacao: ${congregation.name}`
+        : 'Sede / tenant completo',
+    },
+  };
+}
+
 async function ensureTenantExists(tenantId) {
   const tenant = await db('churches')
     .select('id', 'name')
@@ -346,6 +418,7 @@ async function ensureTenantExists(tenantId) {
 }
 
 module.exports = {
+  createTenantOnboarding,
   listTenants,
   getTenantById,
   updateTenantStatus,

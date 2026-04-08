@@ -1,6 +1,16 @@
 # Documentacao - Projeto SaaS Gestao de Igrejas
 
-Esta pasta concentra a documentacao funcional do projeto e foi ajustada para refletir o codigo real atual.
+Esta pasta concentra a documentacao funcional do projeto e deve refletir o codigo real atual.
+
+Pontos de entrada mais uteis para onboarding no estado atual:
+
+- [06 - Autenticacao](./06-autenticacao.md)
+- [15 - Backoffice - Frontend](./15-backoffice-frontend.md)
+- [21 - Backoffice - Execucao Local](./21-backoffice-execucao-local.md)
+
+Observacao:
+- quando houver divergencia entre descricao e implementacao, considere o codigo do repositorio como fonte da verdade
+- documentos de roadmap e limitacoes descrevem apenas lacunas reais identificadas no estado atual do codigo
 
 ## Indice
 
@@ -34,6 +44,10 @@ Documentacao detalhada da camada administrativa da plataforma:
 - [22 - Backoffice - Roadmap](./22-backoffice-roadmap.md)
 - [23 - Fluxo de Criacao de Usuarios](./23-fluxo-de-criacao-de-usuarios.md)
 - [24 - Backoffice - Usuarios](./24-backoffice-usuarios.md)
+- [25 - Fluxo de Onboarding do Tenant](./25-fluxo-de-onboarding-do-tenant.md)
+- [26 - Modulo de Congregacoes do Tenant](./26-modulo-congregacoes-tenant.md)
+- [27 - Modulo de Membros do Tenant](./27-modulo-membros-tenant.md)
+- [28 - Modulo de Cargos Ministeriais do Tenant](./28-modulo-cargos-tenant.md)
 
 ## Observacao
 

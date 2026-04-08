@@ -7,22 +7,7 @@ const logger = require('../../../utils/logger');
 const auditService = require('../audit/audit.service');
 
 async function login({ email, password, ipAddress = null, userAgent = null }) {
-  const platformUser = await db('platform_users as pu')
-    .join('platform_roles as pr', 'pr.id', 'pu.role_id')
-    .select(
-      'pu.id',
-      'pu.role_id',
-      'pu.name',
-      'pu.email',
-      'pu.password_hash',
-      'pu.is_active',
-      'pr.slug as role_slug',
-      'pr.name as role_name',
-      'pr.is_active as role_is_active',
-      'pr.permissions'
-    )
-    .where({ 'pu.email': email })
-    .first();
+  const platformUser = await getPlatformUserRecordByEmail(email);
 
   if (!platformUser || !platformUser.is_active || !platformUser.role_is_active) {
     throw new UnauthorizedError('Credenciais invalidas');
@@ -36,14 +21,7 @@ async function login({ email, password, ipAddress = null, userAgent = null }) {
   const permissions = parsePermissions(platformUser.permissions);
   const tokens = generateTokens(platformUser, permissions);
 
-  await db('platform_users')
-    .where({ id: platformUser.id })
-    .update({
-      refresh_token: tokens.refreshToken,
-      refresh_token_expires: getRefreshExpiration(),
-      last_login: db.fn.now(),
-      updated_at: db.fn.now(),
-    });
+  await saveRefreshToken(platformUser.id, tokens.refreshToken, { updateLastLogin: true });
 
   await auditService.register({
     actorPlatformUserId: platformUser.id,
@@ -66,25 +44,50 @@ async function login({ email, password, ipAddress = null, userAgent = null }) {
   };
 }
 
-async function getMe(platformUserId) {
-  const platformUser = await db('platform_users as pu')
-    .join('platform_roles as pr', 'pr.id', 'pu.role_id')
-    .select(
-      'pu.id',
-      'pu.role_id',
-      'pu.name',
-      'pu.email',
-      'pu.is_active',
-      'pu.last_login',
-      'pr.slug as role_slug',
-      'pr.name as role_name',
-      'pr.is_active as role_is_active',
-      'pr.permissions'
-    )
-    .where({ 'pu.id': platformUserId, 'pu.is_active': true })
-    .first();
+async function refresh({ refreshToken }) {
+  let decoded;
+  try {
+    decoded = jwt.verify(refreshToken, env.platformJwt.refreshSecret);
+  } catch (error) {
+    throw new UnauthorizedError('Refresh token da plataforma invalido ou expirado');
+  }
 
-  if (!platformUser || !platformUser.role_is_active) {
+  if (decoded.scope !== 'platform' || !decoded.platformUserId) {
+    throw new UnauthorizedError('Refresh token da plataforma invalido');
+  }
+
+  const platformUser = await getActivePlatformUserRecordById(decoded.platformUserId);
+
+  if (!platformUser) {
+    throw new UnauthorizedError('Usuario da plataforma nao encontrado ou inativo');
+  }
+
+  if (platformUser.refresh_token !== refreshToken) {
+    await clearRefreshToken(platformUser.id);
+    logger.warn(`Possivel roubo de refresh token de plataforma: user ${platformUser.id}`);
+    throw new UnauthorizedError('Refresh token da plataforma invalido. Faca login novamente.');
+  }
+
+  const permissions = parsePermissions(platformUser.permissions);
+  const tokens = generateTokens(platformUser, permissions);
+
+  await saveRefreshToken(platformUser.id, tokens.refreshToken);
+
+  return {
+    ...tokens,
+    user: formatPlatformUserResponse(platformUser, permissions),
+  };
+}
+
+async function logout(platformUserId) {
+  await clearRefreshToken(platformUserId);
+  logger.info(`Logout backoffice: user ${platformUserId}`);
+}
+
+async function getMe(platformUserId) {
+  const platformUser = await getActivePlatformUserRecordById(platformUserId);
+
+  if (!platformUser) {
     throw new NotFoundError('Usuario da plataforma nao encontrado');
   }
 
@@ -117,11 +120,80 @@ function generateTokens(platformUser, permissions) {
   return { accessToken, refreshToken };
 }
 
+async function saveRefreshToken(platformUserId, refreshToken, options = {}) {
+  const updatePayload = {
+    refresh_token: refreshToken,
+    refresh_token_expires: getRefreshExpiration(),
+    updated_at: db.fn.now(),
+  };
+
+  if (options.updateLastLogin) {
+    updatePayload.last_login = db.fn.now();
+  }
+
+  await db('platform_users').where({ id: platformUserId }).update(updatePayload);
+}
+
+async function clearRefreshToken(platformUserId) {
+  await db('platform_users').where({ id: platformUserId }).update({
+    refresh_token: null,
+    refresh_token_expires: null,
+    updated_at: db.fn.now(),
+  });
+}
+
 function getRefreshExpiration() {
   const days = parseInt(env.platformJwt.refreshExpiresIn, 10) || 7;
   const expiration = new Date();
   expiration.setDate(expiration.getDate() + days);
   return expiration;
+}
+
+async function getPlatformUserRecordByEmail(email) {
+  return db('platform_users as pu')
+    .join('platform_roles as pr', 'pr.id', 'pu.role_id')
+    .select(
+      'pu.id',
+      'pu.role_id',
+      'pu.name',
+      'pu.email',
+      'pu.password_hash',
+      'pu.refresh_token',
+      'pu.is_active',
+      'pu.last_login',
+      'pr.slug as role_slug',
+      'pr.name as role_name',
+      'pr.is_active as role_is_active',
+      'pr.permissions'
+    )
+    .where({ 'pu.email': email })
+    .first();
+}
+
+async function getActivePlatformUserRecordById(platformUserId) {
+  const platformUser = await db('platform_users as pu')
+    .join('platform_roles as pr', 'pr.id', 'pu.role_id')
+    .select(
+      'pu.id',
+      'pu.role_id',
+      'pu.name',
+      'pu.email',
+      'pu.refresh_token',
+      'pu.is_active',
+      'pu.last_login',
+      'pr.slug as role_slug',
+      'pr.name as role_name',
+      'pr.is_active as role_is_active',
+      'pr.permissions'
+    )
+    .where({ 'pu.id': platformUserId, 'pu.is_active': true })
+    .first();
+
+  if (!platformUser || !platformUser.role_is_active) {
+    return null;
+  }
+
+  return platformUser;
 }
 
 function parsePermissions(permissions) {
@@ -151,5 +223,7 @@ function formatPlatformUserResponse(platformUser, permissions) {
 
 module.exports = {
   login,
+  refresh,
+  logout,
   getMe,
 };
