@@ -13,6 +13,7 @@ const errorHandler = require('./middlewares/errorHandler');
 
 // Importar rotas dos módulos
 const authRoutes = require('./modules/auth/auth.routes');
+const congregationsRoutes = require('./modules/congregations/congregations.routes');
 const backofficeRoutes = require('./modules/backoffice/backoffice.routes');
 
 const app = express();
@@ -90,6 +91,7 @@ app.get('/api/health', (_req, res) => {
 // ── ROTAS DOS MÓDULOS ──────────────────────────────────────────────
 
 app.use('/api/auth', authRoutes);
+app.use('/api/congregations', congregationsRoutes);
 app.use('/api/backoffice', backofficeRoutes);
 
 // Futuros módulos serão montados aqui:

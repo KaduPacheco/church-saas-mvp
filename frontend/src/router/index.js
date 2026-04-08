@@ -113,7 +113,7 @@ const router = createRouter({
         {
           path: 'congregations',
           name: 'tenant-congregations',
-          component: () => import('@/views/dashboard/TenantModuleView.vue'),
+          component: () => import('@/views/dashboard/TenantCongregationsView.vue'),
           meta: {
             title: 'Congregacoes',
             permission: 'churches:read',

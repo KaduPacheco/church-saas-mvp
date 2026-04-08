@@ -14,7 +14,7 @@
     "lint:fix": "eslint . --ext .js --fix",
     "format": "prettier --write \"**/*.{js,json,md}\"",
     "format:check": "prettier --check \"**/*.{js,json,md}\"",
-    "test": "node test/backoffice-auth.service.test.js"
+    "test": "node test/run-tests.js"
   },
   "keywords": [
     "church",

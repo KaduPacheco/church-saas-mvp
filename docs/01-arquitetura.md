@@ -93,6 +93,7 @@ Tenant:
 - login tenant funcional
 - dashboard tenant inicial
 - guardas e store proprios
+- modulo de congregacoes do tenant com listagem, detalhe, criacao, edicao e ativacao/inativacao
 
 Backoffice:
 - login de plataforma

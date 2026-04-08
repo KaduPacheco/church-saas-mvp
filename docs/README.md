@@ -45,6 +45,7 @@ Documentacao detalhada da camada administrativa da plataforma:
 - [23 - Fluxo de Criacao de Usuarios](./23-fluxo-de-criacao-de-usuarios.md)
 - [24 - Backoffice - Usuarios](./24-backoffice-usuarios.md)
 - [25 - Fluxo de Onboarding do Tenant](./25-fluxo-de-onboarding-do-tenant.md)
+- [26 - Modulo de Congregacoes do Tenant](./26-modulo-congregacoes-tenant.md)
 
 ## Observacao
 
