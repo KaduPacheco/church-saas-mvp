@@ -1,25 +1,33 @@
-# 07 - Módulo Membros
+# 07 - Modulo Membros
 
-O Módulo Membros representa o núcleo de Cadastro e CRM Pastoral de uma Igreja na aplicação.
+Este documento permanece como visao conceitual resumida do dominio de membros.
 
-## Funcionalidades e Telas Esperadas
-- **Visão em Lista e Filtros**: Uma tabela listando a membresia inteira ou segmentada.
-- **Filtros e Paginação**: Sistemas com alto volume lidarão com paginações API via `LIMIT / OFFSET`. Pesquisáveis por nome e status (ex: listar quem congrega no `Campus X` e encontra-se `Inativo`).
-- **Campos Importantes em Cadastro**:
-  - Dados Básicos Cadastrais: Nome, e-mail (opcional), telefone com máscara (DDD), data de nascimento.
-  - Histórico Institucional: Data e local de batismo; dados de Consagrações Ministeriais; campo de Observações da secretaria.
-  - Status Lógico e Visor: Membro será categorizado (Ativo, Inativo ou Transferido).
+Para a implementacao tenant-side real no branch atual, consulte:
+- [27 - Modulo de Membros do Tenant](./27-modulo-membros-tenant.md)
 
-## Regras e Isolamento
-- O membro pessoa física preenchido e listado aqui não é mecanicamente interligado numa relação `1-para-1` inquebrável como usuário de login na tabela `USERS` no frontend. Este painel serve explicitamente como registro analítico e gerencial.
-- O Membro pode ter `congregation_id` definido, localizando ele a uma filial ou sede específica. 
-- Transações de pagamentos no campo contábil podem relatar um `member_id` para fins explicativos de Ofertas/Dízimos nominais rastreáveis individualmente.
+## Papel do dominio
 
-## Principais Endpoints Rest
-| Método | Endpoint | Permissões (Roles) Mínimas |
-|----|----|----|
+- `members` representa o cadastro pastoral e administrativo da comunidade
+- `users` representa contas tecnicas de acesso ao sistema
+- os dois dominios continuam separados no estado atual do codigo
+
+## Regras conceituais que permanecem validas
+
+- membro pode ter `congregation_id` opcional
+- membro sem `congregation_id` permanece associado a sede
+- o cadastro pode ser usado como referencia para operacao pastoral e rotinas administrativas
+- vinculos futuros entre membro e usuario tecnico podem existir, mas nao fazem parte do fluxo automatico atual
+
+## Endpoints tenant-side atuais
+
+| Metodo | Endpoint | Permissao minima |
+|---|---|---|
 | GET | `/api/members` | `members:read` |
 | GET | `/api/members/:id` | `members:read` |
 | POST | `/api/members` | `members:write` |
 | PUT | `/api/members/:id` | `members:write` |
-| DELETE | `/api/members/:id` | `members:delete` (Recomenda-se lógica de Soft Delete futuro se ligada à tabelas financeiras) |
+| PATCH | `/api/members/:id/status` | `members:delete` |
+
+## Observacao
+
+- a documentacao detalhada de payloads, filtros, escopo por congregacao, UI e validacao fica concentrada no documento `27`

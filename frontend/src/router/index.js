@@ -103,7 +103,7 @@ const router = createRouter({
         {
           path: 'members',
           name: 'tenant-members',
-          component: () => import('@/views/dashboard/TenantModuleView.vue'),
+          component: () => import('@/views/dashboard/TenantMembersView.vue'),
           meta: {
             title: 'Membros',
             permission: 'members:read',

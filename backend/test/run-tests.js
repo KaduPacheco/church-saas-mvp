@@ -4,6 +4,7 @@ const path = require('node:path');
 const tests = [
   'backoffice-auth.service.test.js',
   'congregations.service.test.js',
+  'members.service.test.js',
   'authorize.middleware.test.js',
 ];
 
