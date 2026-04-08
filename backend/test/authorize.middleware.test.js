@@ -48,10 +48,29 @@ async function testAuthorizeAllowsMatchingPermissionAndAdminBypass() {
   });
 }
 
+async function testAuthorizeRejectsMissingRolesWritePermission() {
+  const middleware = authorize('roles:write');
+
+  await assert.rejects(
+    () =>
+      runMiddleware(middleware, {
+        user: {
+          permissions: ['roles:read'],
+        },
+      }),
+    (error) => {
+      assert.equal(error.code, 'FORBIDDEN');
+      assert.match(error.message, /roles:write/);
+      return true;
+    }
+  );
+}
+
 async function run() {
   const tests = [
     ['authorize middleware rejects missing churches:write permission', testAuthorizeRejectsUserWithoutPermission],
     ['authorize middleware allows matching permission and admin bypass', testAuthorizeAllowsMatchingPermissionAndAdminBypass],
+    ['authorize middleware rejects missing roles:write permission', testAuthorizeRejectsMissingRolesWritePermission],
   ];
 
   let failures = 0;

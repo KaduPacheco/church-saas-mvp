@@ -47,6 +47,7 @@ Documentacao detalhada da camada administrativa da plataforma:
 - [25 - Fluxo de Onboarding do Tenant](./25-fluxo-de-onboarding-do-tenant.md)
 - [26 - Modulo de Congregacoes do Tenant](./26-modulo-congregacoes-tenant.md)
 - [27 - Modulo de Membros do Tenant](./27-modulo-membros-tenant.md)
+- [28 - Modulo de Cargos Ministeriais do Tenant](./28-modulo-cargos-tenant.md)
 
 ## Observacao
 

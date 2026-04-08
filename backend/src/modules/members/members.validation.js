@@ -43,6 +43,10 @@ const createMemberValidation = [
     .optional({ nullable: true })
     .isUUID().withMessage('Congregacao invalida'),
 
+  body('roleId')
+    .optional({ nullable: true })
+    .isUUID().withMessage('Cargo ministerial invalido'),
+
   body('email')
     .optional({ values: 'falsy' })
     .trim()
@@ -108,6 +112,11 @@ const createMemberValidation = [
     .optional({ values: 'falsy' })
     .trim()
     .isLength({ max: 20 }).withMessage('CEP deve ter no maximo 20 caracteres'),
+
+  body('observations')
+    .optional({ values: 'falsy' })
+    .trim()
+    .isLength({ max: 5000 }).withMessage('Observacoes devem ter no maximo 5000 caracteres'),
 ];
 
 const updateMemberValidation = [

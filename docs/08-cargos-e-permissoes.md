@@ -1,27 +1,33 @@
-# 08 - Cargos e Permissões (RBAC)
+# 08 - Cargos E Permissoes
 
-Para atender a alta de manda de flexibilização Multi-Tier sem engessar nomenclaturas duras e invariáveis na base (Obreiro, Presbítero, Tesoureiro, Mídia), a plataforma aplica um **Controle de Acesso Baseado em Regras Modulares (RBAC)** focado nas `Roles` configuráveis no painel Web.
+Este documento permanece como visao conceitual resumida da separacao entre dominio ministerial e governanca tecnica.
 
-## Diferença entre Título Social e Perfil de Acesso
-- O "Cargo" é social/espiritual e nominal, ex: "Líder de Louvor Jovem". O sistema cadastra no banco a palavra string na tabela _roles_, porém o fator crucial é o campo complementar no objeto de banco daquela _role_ - um JSONB que enumera o array bruto das permissões sistêmicas (ex: `['members:read', 'events:write']`). Esse é o fator mandatório, em vez do título do cargo.
+Para a implementacao tenant-side real do catalogo de cargos ministeriais no branch atual, consulte:
+- [28 - Modulo de Cargos Ministeriais do Tenant](./28-modulo-cargos-tenant.md)
 
-## Categorização de Extratos de Permissões Padronizadas (Sugestivo)
+## Separacao conceitual consolidada
 
-Na concepção e Setup de uma igreja na ponta do Funil pelo administrador-sys:
-- `admin:full` - Flag especial de bypass. Concede autoridade mestra visando a configuração e manipulação extrema inicial. Ignora checagens isoladas e libera todos botões no UI Vue e lógicas API Node.
-- `dashboard:read` - Habilitação ao resumo visual central e liberação do acesso padrão mínimo de um login ao Home.
-- `members:read` | `members:write` | `members:delete`
-- `roles:read` | `roles:write` | `roles:delete`
-- `financial:read` | `financial:write` | `financial:delete`
-- `churches:read` | `churches:write` 
+- `roles` representa cargos ministeriais da igreja
+- `permission_profiles` representa perfis tecnicos de acesso ao painel do tenant
+- `platform_roles` representa perfis tecnicos do backoffice
+- essas tres camadas continuam separadas no estado atual do codigo
 
-## Respeito do Frontend
-A navegação (Links, botões e tabs) no Vue é protegida por `v-if` atados à uma custom property global. 
-Deseja-se renderizar um botão de Deletar apenas se:
-```vue
-<button v-if="can('members:delete')"> Deletar Membro </button>
-```
+## Regras conceituais que permanecem validas
 
-## Níveis Hierárquicos por Congregação
-Se o usuário A recebe e tem registrado em seu cadastro na tabela `users` a filiação obrigatória em `congregation_id` = 'Campus B', ele encontra-se filtrado a interagir somente com as métricas do "Campus B". Um tesoureiro de bairro mesmo possuindo as flag de `financial:write` não possuirá alcance ou poderio de consulta nem operação no painel geral e consolidado de toda Igreja nem na caixa mestre da sede. 
-Aplica-se em API limitando e forçando a busca baseada no login deste usuário.
+- cargo ministerial nao concede permissao tecnica automaticamente
+- cargo ministerial nao substitui perfil tecnico
+- `members.role_id` representa um vinculo ministerial opcional
+- `users.member_id` representa um vinculo opcional entre conta tecnica e pessoa cadastrada
+- usuarios vinculados a uma congregacao continuam sujeitos ao escopo do seu `congregation_id`
+
+## Permissoes tecnicas do modulo de cargos
+
+| Acao | Permissao |
+|---|---|
+| Listar e detalhar cargos | `roles:read` |
+| Criar e editar cargos | `roles:write` |
+| Alterar status | `roles:delete` |
+
+## Observacao
+
+- a documentacao detalhada de payloads, escopo, endpoints, UI e limitacoes do modulo fica concentrada no documento `28`

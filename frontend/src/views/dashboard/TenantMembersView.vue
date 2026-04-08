@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { membersService } from '@/services/members.service'
 import { congregationsService } from '@/services/congregations.service'
+import { rolesService } from '@/services/roles.service'
 import { useAuthStore } from '@/stores/auth.store'
 
 const authStore = useAuthStore()
@@ -12,11 +13,13 @@ const detailLoading = ref(false)
 const saving = ref(false)
 const statusSaving = ref(false)
 const optionsLoading = ref(false)
+const roleOptionsLoading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 
 const members = ref([])
 const congregations = ref([])
+const roles = ref([])
 const selectedMemberId = ref(null)
 const selectedMember = ref(null)
 
@@ -53,6 +56,7 @@ const filterDraft = reactive({
 const form = reactive({
   name: '',
   congregationId: '',
+  roleId: '',
   email: '',
   phone: '',
   document: '',
@@ -66,12 +70,14 @@ const form = reactive({
   addressNeighborhood: '',
   addressCity: '',
   addressState: '',
-  addressZipcode: ''
+  addressZipcode: '',
+  observations: ''
 })
 
 const formMode = ref('create')
 
 const isScopedUser = computed(() => !!authStore.user?.congregationId)
+const canReadRoles = computed(() => authStore.hasPermission('roles:read'))
 const canWrite = computed(() => authStore.hasPermission('members:write'))
 const canDelete = computed(() => authStore.hasPermission('members:delete'))
 const canManageStatus = computed(() => canDelete.value)
@@ -82,6 +88,16 @@ const availableCongregationOptions = computed(() => {
   }
 
   return congregations.value
+})
+
+const availableRoleOptions = computed(() => {
+  const visibleRoles = roles.value.filter((item) => item.status === 'active' || item.id === form.roleId)
+
+  if (form.roleId && !visibleRoles.some((item) => item.id === form.roleId) && selectedMember.value?.role) {
+    visibleRoles.push(selectedMember.value.role)
+  }
+
+  return visibleRoles
 })
 
 const summaryCards = computed(() => [
@@ -131,6 +147,28 @@ async function loadCongregationOptions() {
     congregations.value = []
   } finally {
     optionsLoading.value = false
+  }
+}
+
+async function loadRoleOptions() {
+  if (!canReadRoles.value) {
+    roles.value = []
+    return
+  }
+
+  roleOptionsLoading.value = true
+
+  try {
+    const response = await rolesService.list({
+      page: 1,
+      perPage: 100
+    })
+
+    roles.value = response.data || []
+  } catch (_error) {
+    roles.value = []
+  } finally {
+    roleOptionsLoading.value = false
   }
 }
 
@@ -205,6 +243,7 @@ async function selectMember(id) {
 function populateForm(member) {
   form.name = member.name || ''
   form.congregationId = member.congregationId || ''
+  form.roleId = member.roleId || ''
   form.email = member.email || ''
   form.phone = member.phone || ''
   form.document = member.document || ''
@@ -219,11 +258,13 @@ function populateForm(member) {
   form.addressCity = member.address?.city || ''
   form.addressState = member.address?.state || ''
   form.addressZipcode = member.address?.zipcode || ''
+  form.observations = member.observations || ''
 }
 
 function resetForm() {
   form.name = ''
   form.congregationId = isScopedUser.value ? authStore.user?.congregationId || '' : ''
+  form.roleId = ''
   form.email = ''
   form.phone = ''
   form.document = ''
@@ -238,6 +279,7 @@ function resetForm() {
   form.addressCity = ''
   form.addressState = ''
   form.addressZipcode = ''
+  form.observations = ''
 }
 
 function openCreateMode() {
@@ -336,6 +378,7 @@ function buildPayloadFromForm() {
   return {
     name: form.name,
     congregationId: form.congregationId || null,
+    roleId: form.roleId || null,
     email: form.email || null,
     phone: form.phone || null,
     document: form.document || null,
@@ -349,7 +392,8 @@ function buildPayloadFromForm() {
     addressNeighborhood: form.addressNeighborhood || null,
     addressCity: form.addressCity || null,
     addressState: form.addressState || null,
-    addressZipcode: form.addressZipcode || null
+    addressZipcode: form.addressZipcode || null,
+    observations: form.observations || null
   }
 }
 
@@ -403,10 +447,21 @@ function formatCongregationLabel(member) {
   return 'Sede / tenant completo'
 }
 
+function formatRoleLabel(member) {
+  if (member.role?.name) {
+    return `Cargo: ${member.role.name}`
+  }
+
+  return 'Sem cargo ministerial'
+}
+
 onMounted(async () => {
   try {
     resetForm()
-    await loadCongregationOptions()
+    await Promise.all([
+      loadCongregationOptions(),
+      loadRoleOptions()
+    ])
     await loadMembers()
   } finally {
     loading.value = false
@@ -557,6 +612,7 @@ onMounted(async () => {
 
             <div class="list-chip-row">
               <span class="inline-chip">{{ formatCongregationLabel(member) }}</span>
+              <span class="inline-chip">{{ formatRoleLabel(member) }}</span>
               <span class="inline-chip" v-if="member.document">{{ member.document }}</span>
             </div>
 
@@ -628,6 +684,11 @@ onMounted(async () => {
                 </div>
 
                 <div>
+                  <dt>Cargo ministerial</dt>
+                  <dd>{{ selectedMember.role?.name || 'Nao informado' }}</dd>
+                </div>
+
+                <div>
                   <dt>Genero</dt>
                   <dd>{{ formatGenderLabel(selectedMember.gender) }}</dd>
                 </div>
@@ -695,6 +756,16 @@ onMounted(async () => {
                 </div>
               </dl>
             </article>
+
+            <article class="detail-card">
+              <h3>Observacoes</h3>
+              <dl class="definition-list">
+                <div>
+                  <dt>Anotacoes pastorais e administrativas</dt>
+                  <dd>{{ selectedMember.observations || 'Nao informadas' }}</dd>
+                </div>
+              </dl>
+            </article>
           </section>
         </template>
 
@@ -733,6 +804,20 @@ onMounted(async () => {
                   :value="congregation.id"
                 >
                   {{ congregation.name }}
+                </option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Cargo ministerial</span>
+              <select v-model="form.roleId" :disabled="roleOptionsLoading || !canReadRoles">
+                <option value="">Sem cargo ministerial</option>
+                <option
+                  v-for="role in availableRoleOptions"
+                  :key="role.id"
+                  :value="role.id"
+                >
+                  {{ role.name }}{{ role.status === 'inactive' ? ' (Inativo)' : '' }}
                 </option>
               </select>
             </label>
@@ -841,6 +926,18 @@ onMounted(async () => {
                 <input v-model="form.addressState" type="text" maxlength="2" />
               </label>
             </div>
+          </section>
+
+          <section class="form-section">
+            <div class="form-section-header">
+              <h4>Observacoes</h4>
+              <p>Campo opcional para registrar contexto pastoral e administrativo do membro.</p>
+            </div>
+
+            <label class="field">
+              <span>Observacoes</span>
+              <textarea v-model="form.observations" rows="5" maxlength="5000" />
+            </label>
           </section>
 
           <div class="form-actions">
@@ -1089,7 +1186,8 @@ onMounted(async () => {
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
   width: 100%;
   min-height: 46px;
   padding: 0.8rem 0.95rem;
@@ -1098,6 +1196,11 @@ onMounted(async () => {
   background: #ffffff;
   color: #0f172a;
   font: inherit;
+}
+
+.field textarea {
+  min-height: 120px;
+  resize: vertical;
 }
 
 .filters-actions,

@@ -123,7 +123,7 @@ const router = createRouter({
         {
           path: 'roles',
           name: 'tenant-roles',
-          component: () => import('@/views/dashboard/TenantModuleView.vue'),
+          component: () => import('@/views/dashboard/TenantRolesView.vue'),
           meta: {
             title: 'Cargos ministeriais',
             permission: 'roles:read',

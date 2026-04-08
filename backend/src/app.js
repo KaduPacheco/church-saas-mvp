@@ -15,6 +15,7 @@ const errorHandler = require('./middlewares/errorHandler');
 const authRoutes = require('./modules/auth/auth.routes');
 const congregationsRoutes = require('./modules/congregations/congregations.routes');
 const membersRoutes = require('./modules/members/members.routes');
+const rolesRoutes = require('./modules/roles/roles.routes');
 const backofficeRoutes = require('./modules/backoffice/backoffice.routes');
 
 const app = express();
@@ -94,11 +95,11 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/congregations', congregationsRoutes);
 app.use('/api/members', membersRoutes);
+app.use('/api/roles', rolesRoutes);
 app.use('/api/backoffice', backofficeRoutes);
 
 // Futuros módulos serão montados aqui:
 // app.use('/api/churches', churchesRoutes);
-// app.use('/api/roles', rolesRoutes);
 // app.use('/api/profiles', profilesRoutes);
 // app.use('/api/financial', financialRoutes);
 // app.use('/api/dashboard', dashboardRoutes);

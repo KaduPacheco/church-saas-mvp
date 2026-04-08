@@ -41,6 +41,7 @@ async function listMembers({
       'm.id',
       'm.church_id',
       'm.congregation_id',
+      'm.role_id',
       'm.name',
       'm.email',
       'm.phone',
@@ -57,9 +58,13 @@ async function listMembers({
       'm.address_city',
       'm.address_state',
       'm.address_zipcode',
+      'm.observations',
       'm.created_at',
       'm.updated_at',
-      'c.name as congregation_name'
+      'c.name as congregation_name',
+      'r.name as role_name',
+      'r.is_active as role_is_active',
+      'r.is_system as role_is_system'
     )
     .orderBy('m.name', 'asc')
     .limit(currentPerPage)
@@ -104,6 +109,7 @@ async function createMember({
   actorCongregationId = null,
   name,
   congregationId = null,
+  roleId = null,
   email,
   phone,
   document,
@@ -118,11 +124,16 @@ async function createMember({
   addressCity,
   addressState,
   addressZipcode,
+  observations,
 }) {
   const targetCongregationId = await resolveMutationCongregationId({
     churchId,
     actorCongregationId,
     congregationId,
+  });
+  const targetRoleId = await resolveMutationRoleId({
+    churchId,
+    roleId,
   });
 
   const [createdMember] = await db('members')
@@ -130,7 +141,7 @@ async function createMember({
       id: uuidv4(),
       church_id: churchId,
       congregation_id: targetCongregationId,
-      role_id: null,
+      role_id: targetRoleId,
       name: normalizeRequiredText(name),
       email: normalizeOptionalEmail(email),
       phone: normalizeOptionalText(phone),
@@ -147,6 +158,7 @@ async function createMember({
       address_city: normalizeOptionalText(addressCity),
       address_state: normalizeOptionalState(addressState),
       address_zipcode: normalizeOptionalText(addressZipcode),
+      observations: normalizeOptionalText(observations),
     })
     .returning('*');
 
@@ -163,6 +175,7 @@ async function updateMember({
   memberId,
   name,
   congregationId,
+  roleId,
   email,
   phone,
   document,
@@ -177,6 +190,7 @@ async function updateMember({
   addressCity,
   addressState,
   addressZipcode,
+  observations,
 }) {
   const existingMember = await findVisibleMember({
     churchId,
@@ -194,11 +208,17 @@ async function updateMember({
     congregationId:
       congregationId === undefined ? existingMember.congregation_id : congregationId,
   });
+  const targetRoleId = await resolveMutationRoleId({
+    churchId,
+    roleId: roleId === undefined ? existingMember.role_id : roleId,
+    currentRoleId: existingMember.role_id,
+  });
 
   await db('members')
     .where({ id: memberId, church_id: churchId })
     .update({
       congregation_id: targetCongregationId,
+      role_id: targetRoleId,
       name: normalizeRequiredText(name),
       email: email === undefined ? existingMember.email : normalizeOptionalEmail(email),
       phone: phone === undefined ? existingMember.phone : normalizeOptionalText(phone),
@@ -240,6 +260,10 @@ async function updateMember({
         addressZipcode === undefined
           ? existingMember.address_zipcode
           : normalizeOptionalText(addressZipcode),
+      observations:
+        observations === undefined
+          ? existingMember.observations
+          : normalizeOptionalText(observations),
       updated_at: db.fn.now(),
     });
 
@@ -293,6 +317,7 @@ function buildVisibleMembersQuery({
 }) {
   return db('members as m')
     .leftJoin('congregations as c', 'c.id', 'm.congregation_id')
+    .leftJoin('roles as r', 'r.id', 'm.role_id')
     .where({ 'm.church_id': churchId })
     .modify((queryBuilder) => {
       if (actorCongregationId) {
@@ -358,6 +383,7 @@ async function findVisibleMember({
       'm.id',
       'm.church_id',
       'm.congregation_id',
+      'm.role_id',
       'm.name',
       'm.email',
       'm.phone',
@@ -374,9 +400,13 @@ async function findVisibleMember({
       'm.address_city',
       'm.address_state',
       'm.address_zipcode',
+      'm.observations',
       'm.created_at',
       'm.updated_at',
-      'c.name as congregation_name'
+      'c.name as congregation_name',
+      'r.name as role_name',
+      'r.is_active as role_is_active',
+      'r.is_system as role_is_system'
     )
     .andWhere('m.id', memberId)
     .first();
@@ -440,11 +470,44 @@ async function ensureCongregationBelongsToTenant(churchId, congregationId) {
   return congregation;
 }
 
+async function resolveMutationRoleId({
+  churchId,
+  roleId,
+  currentRoleId = null,
+}) {
+  if (!roleId) {
+    return null;
+  }
+
+  const role = await ensureRoleBelongsToTenant(churchId, roleId);
+
+  if (!role.is_active && role.id !== currentRoleId) {
+    throw new ForbiddenError(
+      'Nao e permitido atribuir um cargo ministerial inativo a um membro'
+    );
+  }
+
+  return role.id;
+}
+
+async function ensureRoleBelongsToTenant(churchId, roleId) {
+  const role = await db('roles')
+    .where({ id: roleId, church_id: churchId })
+    .first();
+
+  if (!role) {
+    throw new NotFoundError('Cargo ministerial nao encontrado no tenant atual');
+  }
+
+  return role;
+}
+
 function formatMember(member) {
   return {
     id: member.id,
     churchId: member.church_id,
     congregationId: member.congregation_id,
+    roleId: member.role_id,
     name: member.name,
     email: member.email,
     phone: member.phone,
@@ -455,12 +518,21 @@ function formatMember(member) {
     birthDate: member.birth_date,
     baptismDate: member.baptism_date,
     membershipDate: member.membership_date,
+    observations: member.observations,
     createdAt: member.created_at,
     updatedAt: member.updated_at,
     congregation: member.congregation_id
       ? {
           id: member.congregation_id,
           name: member.congregation_name,
+        }
+      : null,
+    role: member.role_id
+      ? {
+          id: member.role_id,
+          name: member.role_name,
+          status: member.role_is_active ? 'active' : 'inactive',
+          isSystem: Boolean(member.role_is_system),
         }
       : null,
     address: {
@@ -534,6 +606,8 @@ module.exports = {
   updateMember,
   updateMemberStatus,
   ensureCongregationBelongsToTenant,
+  ensureRoleBelongsToTenant,
   resolveCongregationScopeFilter,
   resolveMutationCongregationId,
+  resolveMutationRoleId,
 };

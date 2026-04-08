@@ -51,6 +51,7 @@ function createDbMock(seedData = {}) {
   const data = {
     members: (seedData.members || []).map(cloneRecord),
     congregations: (seedData.congregations || []).map(cloneRecord),
+    roles: (seedData.roles || []).map(cloneRecord),
   };
 
   class QueryBuilder {
@@ -292,10 +293,14 @@ function decorateRow(table, row, data) {
   }
 
   const congregation = data.congregations.find((item) => item.id === row.congregation_id);
+  const role = data.roles.find((item) => item.id === row.role_id);
 
   return {
     ...row,
     congregation_name: congregation?.name || null,
+    role_name: role?.name || null,
+    role_is_active: role?.is_active ?? null,
+    role_is_system: role?.is_system ?? null,
   };
 }
 
@@ -338,11 +343,35 @@ function createSeedData() {
         status: 'active',
       },
     ],
+    roles: [
+      {
+        id: 'role-a-active',
+        church_id: 'tenant-a',
+        name: 'Pastor auxiliar',
+        is_active: true,
+        is_system: false,
+      },
+      {
+        id: 'role-a-inactive',
+        church_id: 'tenant-a',
+        name: 'Coordenador legado',
+        is_active: false,
+        is_system: false,
+      },
+      {
+        id: 'role-b-active',
+        church_id: 'tenant-b',
+        name: 'Missionario externo',
+        is_active: true,
+        is_system: false,
+      },
+    ],
     members: [
       {
         id: 'member-a1',
         church_id: 'tenant-a',
         congregation_id: null,
+        role_id: null,
         name: 'Ana Souza',
         email: 'ana@tenant-a.com',
         phone: '11999990001',
@@ -359,6 +388,7 @@ function createSeedData() {
         address_city: 'Sao Paulo',
         address_state: 'SP',
         address_zipcode: '01000-000',
+        observations: 'Membro da sede',
         created_at: '2026-04-01T10:00:00.000Z',
         updated_at: '2026-04-02T10:00:00.000Z',
       },
@@ -366,6 +396,7 @@ function createSeedData() {
         id: 'member-a2',
         church_id: 'tenant-a',
         congregation_id: 'cong-a',
+        role_id: 'role-a-active',
         name: 'Bruno Lima',
         email: 'bruno@tenant-a.com',
         phone: '11999990002',
@@ -382,6 +413,7 @@ function createSeedData() {
         address_city: 'Sao Paulo',
         address_state: 'SP',
         address_zipcode: '02000-000',
+        observations: 'Atua na equipe ministerial',
         created_at: '2026-04-03T10:00:00.000Z',
         updated_at: '2026-04-04T10:00:00.000Z',
       },
@@ -389,6 +421,7 @@ function createSeedData() {
         id: 'member-a3',
         church_id: 'tenant-a',
         congregation_id: 'cong-b',
+        role_id: 'role-a-inactive',
         name: 'Carla Dias',
         email: 'carla@tenant-a.com',
         phone: '11999990003',
@@ -405,6 +438,7 @@ function createSeedData() {
         address_city: 'Campinas',
         address_state: 'SP',
         address_zipcode: '13000-000',
+        observations: null,
         created_at: '2026-04-05T10:00:00.000Z',
         updated_at: '2026-04-06T10:00:00.000Z',
       },
@@ -412,6 +446,7 @@ function createSeedData() {
         id: 'member-b1',
         church_id: 'tenant-b',
         congregation_id: 'cong-c',
+        role_id: 'role-b-active',
         name: 'Daniel Rocha',
         email: 'daniel@tenant-b.com',
         phone: '21999990004',
@@ -428,6 +463,7 @@ function createSeedData() {
         address_city: 'Rio de Janeiro',
         address_state: 'RJ',
         address_zipcode: '20000-000',
+        observations: 'Outro tenant',
         created_at: '2026-04-07T10:00:00.000Z',
         updated_at: '2026-04-08T10:00:00.000Z',
       },
@@ -455,6 +491,7 @@ async function testListMembersRespectsTenantIsolationAndFilters() {
     assert.equal(result.data.length, 1);
     assert.equal(result.data[0].id, 'member-a2');
     assert.equal(result.data[0].congregation.name, 'Central');
+    assert.equal(result.data[0].role.name, 'Pastor auxiliar');
     assert.equal(result.meta.total, 1);
     assert.deepEqual(result.summary, {
       total: 1,
@@ -485,6 +522,8 @@ async function testGetMemberByIdAndScopedVisibility() {
 
     assert.equal(member.id, 'member-a1');
     assert.equal(member.congregation, null);
+    assert.equal(member.role, null);
+    assert.equal(member.observations, 'Membro da sede');
     assert.match(member.address.label, /Rua Um/);
 
     await assert.rejects(
@@ -516,19 +555,37 @@ async function testCreateMemberPersistsWithinTenantAndScopedUserCannotEscapeCong
       churchId: 'tenant-a',
       name: 'Eva Mendes',
       congregationId: 'cong-b',
+      roleId: 'role-a-active',
       email: 'EVA@TENANT-A.COM',
       phone: '11999990005',
       document: '55555555555',
       addressCity: 'Santos',
       addressState: 'sp',
+      observations: 'Nova integrante da equipe',
     });
 
     assert.equal(created.id, 'generated-member');
     assert.equal(created.churchId, 'tenant-a');
     assert.equal(created.congregationId, 'cong-b');
+    assert.equal(created.roleId, 'role-a-active');
+    assert.equal(created.role.name, 'Pastor auxiliar');
     assert.equal(created.email, 'eva@tenant-a.com');
     assert.equal(created.address.state, 'SP');
+    assert.equal(created.observations, 'Nova integrante da equipe');
     assert.equal(created.status, 'active');
+
+    await assert.rejects(
+      () =>
+        service.createMember({
+          churchId: 'tenant-a',
+          name: 'Role Invalida',
+          roleId: 'role-b-active',
+        }),
+      (error) => {
+        assert.equal(error.code, 'NOT_FOUND');
+        return true;
+      }
+    );
 
     await assert.rejects(
       () =>
@@ -561,15 +618,20 @@ async function testUpdateMemberAndRejectCrossTenantCongregation() {
       memberId: 'member-a2',
       name: 'Bruno Lima Atualizado',
       congregationId: null,
+      roleId: null,
       phone: '11988887777',
       addressCity: 'Guarulhos',
+      observations: 'Passou a servir na sede',
     });
 
     assert.equal(updated.id, 'member-a2');
     assert.equal(updated.name, 'Bruno Lima Atualizado');
     assert.equal(updated.congregationId, null);
+    assert.equal(updated.roleId, null);
+    assert.equal(updated.role, null);
     assert.equal(updated.phone, '11988887777');
     assert.equal(updated.address.city, 'Guarulhos');
+    assert.equal(updated.observations, 'Passou a servir na sede');
 
     await assert.rejects(
       () =>
@@ -577,7 +639,7 @@ async function testUpdateMemberAndRejectCrossTenantCongregation() {
           churchId: 'tenant-a',
           memberId: 'member-a2',
           name: 'Bruno Lima',
-          congregationId: 'cong-c',
+          roleId: 'role-b-active',
         }),
       (error) => {
         assert.equal(error.code, 'NOT_FOUND');
@@ -629,6 +691,40 @@ async function testUpdateMemberStatusAndScopedFilterProtection() {
   }
 }
 
+async function testUpdateMemberAllowsKeepingInactiveRoleButBlocksNewInactiveAssignment() {
+  const db = createDbMock(createSeedData());
+  const { service, cleanup } = loadMembersService({
+    [modulePaths.db]: db,
+    [modulePaths.uuid]: { v4: () => 'generated-member' },
+  });
+
+  try {
+    const keptInactiveRole = await service.updateMember({
+      churchId: 'tenant-a',
+      memberId: 'member-a3',
+      name: 'Carla Dias',
+    });
+
+    assert.equal(keptInactiveRole.roleId, 'role-a-inactive');
+    assert.equal(keptInactiveRole.role.status, 'inactive');
+
+    await assert.rejects(
+      () =>
+        service.createMember({
+          churchId: 'tenant-a',
+          name: 'Novo com cargo inativo',
+          roleId: 'role-a-inactive',
+        }),
+      (error) => {
+        assert.equal(error.code, 'FORBIDDEN');
+        return true;
+      }
+    );
+  } finally {
+    cleanup();
+  }
+}
+
 async function run() {
   const tests = [
     ['members list respects tenant isolation and filters', testListMembersRespectsTenantIsolationAndFilters],
@@ -636,6 +732,7 @@ async function run() {
     ['members create persists within tenant and blocks scoped escape', testCreateMemberPersistsWithinTenantAndScopedUserCannotEscapeCongregation],
     ['members update persists and rejects congregation from another tenant', testUpdateMemberAndRejectCrossTenantCongregation],
     ['members status update works and scoped filter escape is forbidden', testUpdateMemberStatusAndScopedFilterProtection],
+    ['members keep existing inactive role but block new inactive assignments', testUpdateMemberAllowsKeepingInactiveRoleButBlocksNewInactiveAssignment],
   ];
 
   let failures = 0;
